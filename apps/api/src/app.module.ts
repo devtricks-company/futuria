@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { MongoExceptionFilter } from './common/mongo-exception.filter.js';
 import { createValidationPipe } from './common/validation.js';
@@ -19,6 +20,7 @@ import { UsersModule } from './users/users.module.js';
       validate: validateEnv,
     }),
     DatabaseModule,
+    AiModule,
     UsersModule,
     AuthModule,
     SimulationsModule,

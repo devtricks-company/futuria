@@ -1,6 +1,7 @@
 /*
  * Runs before each e2e test file: point the app at a throwaway futuria_test_* database and use
- * dev auth. Each file gets its own database, which the file drops when it finishes.
+ * dev auth, fixture AI and the inline pipeline. Each file gets its own database, which the file
+ * drops when it finishes.
  *
  * The server is MONGODB_TEST_URI from the environment (CI) or apps/api/.env, for example an Atlas
  * cluster. Without it, tests use the local MongoDB. Tests never read MONGODB_URI, so they can't
@@ -25,3 +26,7 @@ const suffix = `${process.pid}_${Math.random().toString(36).slice(2, 8)}`;
 process.env.MONGODB_URI = withDatabase(testServerUri().trim(), `futuria_test_${suffix}`);
 process.env.NODE_ENV = 'test';
 process.env.AUTH_MODE = 'dev';
+// Never call Claude or Inngest from tests: fixture AI, pipeline steps run in-process.
+process.env.AI_MODE = 'fixture';
+process.env.PIPELINE_MODE = 'inline';
+process.env.INNGEST_DEV = '0';

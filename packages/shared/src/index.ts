@@ -4,4 +4,5 @@ export * from './results';
 export * from './plans';
 export * from './field-labels';
 export * from './simulation';
+export * from './ai';
 export { SARA_MODEL } from './fixtures/sara';

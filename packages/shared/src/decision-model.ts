@@ -120,7 +120,12 @@ export const newJobPathSchema = z.object({
   monthsToFindJob: distributionSchema.describe('Months until the new job starts'),
   newMonthlyNetSalary: distributionSchema.describe('Take-home pay in the new job'),
   annualRaisePct: distributionSchema.default({ kind: 'fixed', value: 0.03 }),
-  signOnBonus: money.default(0).describe('One-off bonus (net) in the first month of the new job'),
+  signOnBonus: z
+    .number()
+    .default(0)
+    .describe(
+      'One-off net amount in the first month of the new job: a bonus (positive) or a cost such as relocation (negative)',
+    ),
 });
 
 /** Keep (part of) the job while building a freelance business, then go full-time. */

@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { type DecisionModelInput, SARA_MODEL, type SimulationDto } from '@futuria/shared';
-import { closeTestApp, createTestApp } from './test-app.js';
+import { closeTestApp, createTestApp, settlePipeline } from './test-app.js';
 
 const DECISION = 'What if I quit my job to become a freelance UX designer?';
 
@@ -41,7 +41,15 @@ describe('Simulations API (e2e)', () => {
     await alice().get('/simulations/not-an-id').expect(400);
   });
 
-  it('runs the full lifecycle: draft -> model_ready -> ready', async () => {
+  /** POST /run, wait for the in-process pipeline, return the finished simulation. */
+  const runToEnd = async (id: string): Promise<SimulationDto> => {
+    const queued = await alice().post(`/simulations/${id}/run`).expect(202);
+    expect(queued.body.status).toBe('queued');
+    await settlePipeline(app);
+    return (await alice().get(`/simulations/${id}`).expect(200)).body as SimulationDto;
+  };
+
+  it('runs the full lifecycle: draft -> model_ready -> queued -> ready', async () => {
     const created = await alice().post('/simulations').send({ decisionText: DECISION }).expect(201);
     const draft = created.body as SimulationDto;
     expect(draft).toMatchObject({ status: 'draft', title: DECISION, model: null, analysis: null });
@@ -57,9 +65,8 @@ describe('Simulations API (e2e)', () => {
     expect(withModel.body.status).toBe('model_ready');
     expect(withModel.body.model.paths).toHaveLength(3);
 
-    const ran = await alice().post(`/simulations/${draft.id}/run`).expect(200);
-    const ready = ran.body as SimulationDto;
-    expect(ready.status).toBe('ready');
+    const ready = await runToEnd(draft.id);
+    expect(ready).toMatchObject({ status: 'ready', error: null });
     expect(ready.engineVersion).toMatch(/^\d+\.\d+\.\d+$/);
     expect(ready.analysis!.result.paths.map((p) => p.pathId)).toEqual([
       'stay',
@@ -67,17 +74,14 @@ describe('Simulations API (e2e)', () => {
       'hybrid',
     ]);
     expect(Object.keys(ready.analysis!.byPath).sort()).toEqual(['freelance', 'hybrid', 'stay']);
+    expect(Object.keys(ready.narrative!).sort()).toEqual(['freelance', 'hybrid', 'stay']);
 
     // Stored results survive the round trip, including dotted keys in sampled values.
-    const fetched = (await alice().get(`/simulations/${draft.id}`).expect(200))
-      .body as SimulationDto;
-    const freelance = fetched.analysis!.result.paths.find((p) => p.pathId === 'freelance')!;
+    const freelance = ready.analysis!.result.paths.find((p) => p.pathId === 'freelance')!;
     expect(freelance.scenarios.realistic.sampled).toHaveProperty(['baseline.monthlyExpenses']);
-    expect(fetched.analysis).toEqual(ready.analysis);
 
     // Re-running uses the stored seed, so results are identical.
-    const rerun = (await alice().post(`/simulations/${draft.id}/run`).expect(200))
-      .body as SimulationDto;
+    const rerun = await runToEnd(draft.id);
     expect(rerun.analysis).toEqual(ready.analysis);
 
     // Editing the model clears results that no longer match it.
@@ -85,7 +89,7 @@ describe('Simulations API (e2e)', () => {
       .patch(`/simulations/${draft.id}/model`)
       .send({ model: { ...SARA_MODEL, paths: SARA_MODEL.paths.slice(0, 2) } })
       .expect(200);
-    expect(edited.body).toMatchObject({ status: 'model_ready', analysis: null });
+    expect(edited.body).toMatchObject({ status: 'model_ready', analysis: null, narrative: null });
   });
 
   it('accepts a model at creation and rejects invalid models', async () => {

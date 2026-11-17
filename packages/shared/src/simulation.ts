@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { type DecisionModel, decisionModelSchema } from './decision-model';
+import {
+  type PathNarrative,
+  type SimulationIntake,
+  intakeAnswerSchema,
+  proposedPathSchema,
+} from './ai';
+import { type DecisionModel, PATH_TYPES, decisionModelSchema } from './decision-model';
 import type { PlanId, PlanLimits } from './plans';
 import type { FullAnalysis } from './results';
 
@@ -7,11 +13,13 @@ import type { FullAnalysis } from './results';
  * Simulation lifecycle shared by the API (enforcement) and the web app (UI states).
  *
  *   draft ─► intake_ready ─► model_ready ─► queued ─► simulating ─► narrating ─► ready
- *                                 ▲                       │             │         │
- *                                 └──── edit model ◄──────┴─────────────┴── failed ┘
  *
- * Phase 2 runs the engine synchronously (model_ready ─► simulating ─► ready). Phase 3 adds
- * the AI intake, the Inngest queue and the narrative step.
+ * - A draft can also get a model directly (PATCH /model), skipping the AI intake.
+ * - A draft whose intake is out of scope or a crisis stays a draft: the AI flow stops there.
+ * - The run pipeline (Inngest) owns queued / simulating / narrating; any failure ends in failed.
+ * - From ready or failed: edit answers (intake_ready), edit the model (model_ready), re-run or
+ *   refresh the story (queued). A story-only refresh goes queued ─► narrating ─► ready and
+ *   keeps the engine results.
  */
 export const SIMULATION_STATUSES = [
   'draft',
@@ -27,14 +35,17 @@ export type SimulationStatus = (typeof SIMULATION_STATUSES)[number];
 
 export const STATUS_TRANSITIONS: Record<SimulationStatus, readonly SimulationStatus[]> = {
   draft: ['intake_ready', 'model_ready', 'failed'],
-  intake_ready: ['model_ready', 'failed'],
-  model_ready: ['model_ready', 'queued', 'simulating', 'failed'],
-  queued: ['simulating', 'failed'],
-  simulating: ['narrating', 'ready', 'failed'],
+  intake_ready: ['intake_ready', 'model_ready', 'failed'],
+  model_ready: ['intake_ready', 'model_ready', 'queued', 'failed'],
+  queued: ['simulating', 'narrating', 'failed'],
+  simulating: ['narrating', 'failed'],
   narrating: ['ready', 'failed'],
-  ready: ['model_ready', 'queued', 'simulating'],
-  failed: ['model_ready', 'queued', 'simulating'],
+  ready: ['intake_ready', 'model_ready', 'queued'],
+  failed: ['intake_ready', 'model_ready', 'queued'],
 };
+
+/** Statuses in which the run pipeline owns the simulation (edits and new runs are refused). */
+export const BUSY_STATUSES: readonly SimulationStatus[] = ['queued', 'simulating', 'narrating'];
 
 export function canTransition(from: SimulationStatus, to: SimulationStatus): boolean {
   return STATUS_TRANSITIONS[from].includes(to);
@@ -61,6 +72,38 @@ export const updateModelRequestSchema = z.object({
 });
 export type UpdateModelRequest = z.output<typeof updateModelRequestSchema>;
 
+/** Step 1 of the journey: a free-text decision, analyzed by Claude. */
+export const intakeRequestSchema = z.object({
+  decisionText: z.string().trim().min(5).max(1000),
+});
+export type IntakeRequest = z.output<typeof intakeRequestSchema>;
+
+export const pathIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9][a-z0-9_-]{0,31}$/, 'Use lowercase letters, digits, "-" or "_" (max 32)');
+
+/** Answers to the intake questions, plus the paths the person kept, renamed or added. */
+export const intakeAnswersRequestSchema = z.object({
+  answers: z
+    .record(z.string().min(1).max(64), intakeAnswerSchema)
+    .refine((answers) => Object.keys(answers).length <= 20, 'At most 20 answers'),
+  paths: z
+    .array(
+      proposedPathSchema.extend({
+        id: pathIdSchema,
+        name: z.string().trim().min(1).max(80),
+        type: z.enum(PATH_TYPES),
+        summary: z.string().trim().max(300).default(''),
+      }),
+    )
+    .min(1)
+    .max(8)
+    .refine((paths) => new Set(paths.map((p) => p.id)).size === paths.length, 'Duplicate path id')
+    .optional(),
+});
+export type IntakeAnswersRequest = z.output<typeof intakeAnswersRequestSchema>;
+
 /* ---------- Response shapes ---------- */
 
 export interface SimulationDto {
@@ -68,10 +111,14 @@ export interface SimulationDto {
   title: string;
   decisionText: string;
   status: SimulationStatus;
+  intake: SimulationIntake | null;
   model: DecisionModel | null;
   seed: number;
   analysis: FullAnalysis | null;
+  /** Time Machine narrative and action plan, keyed by path id. */
+  narrative: Record<string, PathNarrative> | null;
   engineVersion: string | null;
+  promptVersion: string | null;
   error: string | null;
   share: { slug: string | null; isPublic: boolean };
   createdAt: string;

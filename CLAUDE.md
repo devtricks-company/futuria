@@ -29,7 +29,13 @@ pnpm --filter @futuria/engine demo    # Sara's 3 paths: metrics, sensitivity, ac
 pnpm --filter @futuria/api test:e2e       # throwaway futuria_test_* databases on MONGODB_TEST_URI or local MongoDB
 pnpm --filter @futuria/api db:setup       # create collections + indexes in the futuria database
 pnpm --filter @futuria/api db:setup --seed  # ...and add Sara's sample simulation for dev-user
-pnpm --filter @futuria/api smoke          # walk every API endpoint against a running API (see docs/TESTING.md)
+pnpm --filter @futuria/api smoke          # walk Sara's journey through a running API (see docs/TESTING.md)
+pnpm --filter @futuria/api ai:probe       # check the Claude endpoint/gateway supports what we use (~$0.05)
+pnpm eval --fixture                       # free dry run of the AI eval harness
+pnpm eval --yes                           # real-Claude eval of 30 personas (~$9; run before prompt changes)
+pnpm eval --replay evals/results/<file>.json   # re-score a saved run for free (after changing checks)
+pnpm --filter @futuria/api fixtures:record --yes   # record real intake/model outputs for AI_MODE=fixture
+npx inngest-cli@latest dev -u http://localhost:4000/api/inngest   # Inngest Dev Server (UI on :8288)
 ```
 
 ## Local services
@@ -45,6 +51,14 @@ pnpm --filter @futuria/api smoke          # walk every API endpoint against a ru
 - **Auth:** with no `CLERK_SECRET_KEY`, the API runs in `AUTH_MODE=dev`. The user comes from the
   `x-dev-user` header (default `dev-user`) and is stored as `dev:<name>`. Dev mode is refused
   when `NODE_ENV=production`.
+- **Claude:** with no `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`, the API runs in
+  `AI_MODE=fixture`: recorded outputs (`apps/api/fixtures/ai/`) when the input matches exactly,
+  else deterministic synthetic ones (`src/ai/synthetic.ts`). No API calls, no cost. Calls can go
+  through a gateway via `ANTHROPIC_BASE_URL` (root, no `/v1`); `AI_REFUSAL_FALLBACK` and
+  `AI_PROMPT_CACHE` switch off features a gateway rejects. Fixture mode is refused in production.
+- **Pipeline:** `PIPELINE_MODE=inline` (default without Inngest config) runs the run steps in the
+  API process; `inngest` sends an event (`INNGEST_DEV=1` for the local Dev Server, cloud keys in
+  production). Inline is refused in production. E2E tests force fixture AI + inline pipeline.
 
 Packages are built with tsup to `dist/` (ESM + CJS + d.ts). Apps import the built output, so after
 changing `shared` or `engine` outside `pnpm dev`, rebuild them (`pnpm build` or turbo does it via
@@ -82,8 +96,29 @@ changing `shared` or `engine` outside `pnpm dev`, rebuild them (`pnpm build` or 
     horizon.
 - **Money and rates:** monthly amounts in the model's currency; rates and probabilities are
   fractions (0.25 = 25%).
-- **Claude API (Phase 3+):** `@anthropic-ai/sdk`, model `claude-opus-5-5`, `client.messages.parse`
-  with `zodOutputFormat`, explicit `output_config.effort`, no `temperature`, check `stop_reason`
-  (refusal / max_tokens) before reading output. Claude must never invent final numbers; the
-  engine computes them.
+- **Claude API (`apps/api/src/ai`):** `@anthropic-ai/sdk` (pinned 1.8.0), model `claude-opus-5-5`,
+  `client.beta.messages.parse` with `betaZodOutputFormat`, explicit `output_config.effort`, no
+  `temperature`, server-side refusal fallback, `cache_control` on the two system blocks (domain
+  prompt, step rules) with user data last as escaped JSON in `<user_data>`. Check `stop_reason`
+  (refusal / max_tokens) before reading output; SDK errors map to `AiError` (retryable or not).
+  Claude must never invent final numbers; the engine computes them.
+  - **Claude-facing schemas carry no bounds** (no min/max/length): structured outputs can't
+    enforce them and the SDK would reject the whole answer. Limits are applied after parsing:
+    `normalize.ts` (intake), `clamps.ts` (model numbers, percent-to-fraction), then
+    `decisionModelSchema`.
+  - **Output grammars have a size limit.** Intake and narrative use `betaZodOutputFormat`. The
+    decision model can't: from two paths up the API answers "compiled grammar is too large", so
+    `buildModel` puts the JSON Schema in the prompt and validates the JSON reply with Zod (one
+    correction round). Its schema is built per request (`modelOutputSchemaFor`): distributions are
+    `{low, likely, high}` (equal values = fixed) and paths are keyed `path_1..n`. Before adding
+    fields to the intake or narrative schemas, check they still compile against the real API.
+  - Prompts live in `ai/prompts/*.ts`; bump the step's version (`intake@1`, ...) on any prompt
+    change and run the eval. Every call records an `AiUsageRecord` on `simulation.aiUsage`.
+  - Narratives may only state money figures from the facts (`grounding.ts`, checked by evals and
+    logged at runtime).
+- **Run pipeline (`apps/api/src/pipeline`):** `POST /run` and `/renarrate` return 202 and queue
+  a run; clients poll `GET /simulations/:id`. Steps (`load`, `engine`, `narrate-<path>`,
+  `finalize`) are plain `PipelineService` methods scoped to `pipelineRunId`, so retries are safe
+  and stale runs touch nothing. A refused story leaves that path without a narrative instead of
+  failing the run.
 - Never put secrets in the repo. `.env*` files are gitignored except `.env.example`.

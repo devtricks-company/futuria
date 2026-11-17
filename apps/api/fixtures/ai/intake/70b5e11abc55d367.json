@@ -1,0 +1,110 @@
+{
+  "step": "intake",
+  "recordedAt": "2026-11-17T12:31:33.327Z",
+  "model": "claude-opus-5-5",
+  "promptVersion": "intake@3",
+  "input": {
+    "decisionText": "What if I quit my job to become a freelance UX designer?"
+  },
+  "output": {
+    "inScope": true,
+    "category": "freelance",
+    "safetyFlag": "none",
+    "title": "Quit job to freelance as UX designer",
+    "questions": [
+      {
+        "id": "monthly_take_home",
+        "prompt": "What is your current monthly take-home pay after taxes?",
+        "kind": "money",
+        "helpText": "Use the amount that lands in your account each month.",
+        "options": [],
+        "defaultValue": 4000,
+        "informs": "baseline.currentMonthlyNetSalary"
+      },
+      {
+        "id": "monthly_expenses",
+        "prompt": "How much do you spend on living expenses in a typical month?",
+        "kind": "money",
+        "helpText": "Include rent, food, insurance, debt payments and subscriptions. Most people underestimate by 10-20%.",
+        "options": [],
+        "defaultValue": 2800,
+        "informs": "baseline.monthlyExpenses"
+      },
+      {
+        "id": "savings",
+        "prompt": "How much savings could you draw on today if income stopped?",
+        "kind": "money",
+        "helpText": "Count cash and easily accessible savings, not retirement accounts.",
+        "options": [],
+        "defaultValue": 15000,
+        "informs": "baseline.startingCash"
+      },
+      {
+        "id": "existing_leads",
+        "prompt": "How many potential clients or warm leads do you already have lined up?",
+        "kind": "choice",
+        "helpText": "Past colleagues, agencies or companies that have shown interest count as warm leads.",
+        "options": [
+          "Signed work ready to start",
+          "A few warm leads",
+          "Some contacts but nothing concrete",
+          "Starting from scratch"
+        ],
+        "defaultValue": "Some contacts but nothing concrete",
+        "informs": "monthsToFirstClient"
+      },
+      {
+        "id": "hourly_rate",
+        "prompt": "What hourly rate do you expect to charge clients?",
+        "kind": "money",
+        "helpText": "Experienced UX designers often charge 1.5-3x the hourly equivalent of their salary.",
+        "options": [],
+        "defaultValue": 60,
+        "informs": "hourlyRate"
+      },
+      {
+        "id": "billable_hours",
+        "prompt": "How many hours per week do you expect to bill once you are established?",
+        "kind": "hours",
+        "helpText": "Most full-time freelancers bill 15-30 hours a week; the rest goes to sales and admin.",
+        "options": [],
+        "defaultValue": 22,
+        "informs": "billableHoursPerWeek"
+      },
+      {
+        "id": "can_return_to_job",
+        "prompt": "If freelancing does not work out, how easily could you get a design job again?",
+        "kind": "choice",
+        "helpText": "This shapes how a fallback could limit the downside.",
+        "options": [
+          "Easily, within 1-3 months",
+          "Possibly, within 3-6 months",
+          "It would be hard"
+        ],
+        "defaultValue": "Possibly, within 3-6 months",
+        "informs": null
+      }
+    ],
+    "proposedPaths": [
+      {
+        "id": "stay",
+        "name": "Stay in your current job",
+        "type": "stay",
+        "summary": "You keep your salary and benefits, with typical raises and a small chance of layoff."
+      },
+      {
+        "id": "freelance",
+        "name": "Quit & freelance full-time",
+        "type": "freelance",
+        "summary": "You leave your job now and build a full-time UX design practice, living on savings until client work ramps up."
+      },
+      {
+        "id": "hybrid",
+        "name": "Freelance on the side first",
+        "type": "hybrid",
+        "summary": "You keep your job for several months while landing first clients on evenings and weekends, then switch when side income or savings make it safer."
+      }
+    ]
+  },
+  "key": "70b5e11abc55d367"
+}
