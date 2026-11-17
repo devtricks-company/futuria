@@ -19,7 +19,7 @@ and narrates the results.
 - **Phase 0 (foundations)**: done, except the hosted deploys (they need your Vercel, Railway or
   Fly, and MongoDB Atlas accounts).
 - **Phase 1 (simulation engine)**: done.
-- **Phase 2 (API core and data)**: done, on local MongoDB with dev auth until Clerk keys are added.
+- **Phase 2 (API core and data)**: done, on MongoDB Atlas with dev auth until Clerk keys are added.
 
 Next is Phase 3 (AI layer and pipeline). See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -29,12 +29,12 @@ Requirements:
 
 - Node 24
 - pnpm 11 (`corepack enable`)
-- MongoDB running locally on `127.0.0.1:27017`, either as a Windows service or with
-  `docker compose up -d`
+- A MongoDB Atlas cluster (the free tier is fine), with your IP on its Network Access list.
+  A local MongoDB (`docker compose up -d`) also works.
 
 ```sh
 pnpm install
-cp apps/api/.env.example apps/api/.env              # local defaults: dev auth, local MongoDB
+cp apps/api/.env.example apps/api/.env              # then paste your Atlas string into MONGODB_URI
 pnpm build                                          # build shared packages and apps
 pnpm --filter @futuria/api db:setup --seed          # create the "futuria" database + Sara sample
 pnpm --filter @futuria/engine demo                  # see the engine on the "Sara" example

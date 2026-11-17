@@ -12,6 +12,19 @@ describe('validateEnv', () => {
     });
   });
 
+  it('accepts Atlas connection strings and defaults the database to futuria', () => {
+    const atlas =
+      'mongodb+srv://app:secret@cluster0.ab12c.mongodb.net/?retryWrites=true&w=majority';
+    expect(validateEnv({ MONGODB_URI: atlas }).MONGODB_URI).toBe(
+      'mongodb+srv://app:secret@cluster0.ab12c.mongodb.net/futuria?retryWrites=true&w=majority',
+    );
+    const named = 'mongodb+srv://app:secret@cluster0.ab12c.mongodb.net/staging?w=majority';
+    expect(validateEnv({ MONGODB_URI: named }).MONGODB_URI).toBe(named);
+    expect(() => validateEnv({ MONGODB_URI: 'cluster0.ab12c.mongodb.net' })).toThrow(
+      /mongodb\+srv:\/\//,
+    );
+  });
+
   it('switches to Clerk auth when a secret key is present', () => {
     expect(validateEnv({ CLERK_SECRET_KEY: 'sk_test_x' }).AUTH_MODE).toBe('clerk');
   });

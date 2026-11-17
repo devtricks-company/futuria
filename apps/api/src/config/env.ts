@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_DATABASE, databaseName, isMongoUri, withDatabase } from '../database/mongo-uri.js';
 
 /** Environment variables, validated at startup. Defaults suit local development. */
 const envSchema = z.object({
@@ -6,7 +7,13 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   /** Comma-separated browser origins allowed by CORS (and Clerk authorized parties). */
   WEB_ORIGIN: z.string().default('http://localhost:3000'),
-  MONGODB_URI: z.string().default('mongodb://127.0.0.1:27017/futuria'),
+  /** MongoDB Atlas (`mongodb+srv://`) or local (`mongodb://`). No database name means "futuria". */
+  MONGODB_URI: z
+    .string()
+    .trim()
+    .refine(isMongoUri, 'must be a mongodb:// or mongodb+srv:// connection string')
+    .transform((uri) => (databaseName(uri) ? uri : withDatabase(uri, DEFAULT_DATABASE)))
+    .default(`mongodb://127.0.0.1:27017/${DEFAULT_DATABASE}`),
   /** "clerk" verifies Clerk session tokens; "dev" trusts an x-dev-user header (never in production). */
   AUTH_MODE: z.enum(['clerk', 'dev']).optional(),
   CLERK_SECRET_KEY: z.string().min(1).optional(),

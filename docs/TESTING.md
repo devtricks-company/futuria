@@ -4,7 +4,7 @@ What exists so far:
 
 - **Phase 0:** the monorepo and a status page
 - **Phase 1:** the simulation engine
-- **Phase 2:** the NestJS API on your local MongoDB `futuria` database
+- **Phase 2:** the NestJS API on the `futuria` database in your MongoDB Atlas cluster
 
 There's no simulation UI yet (that's Phase 4), so you test in four layers: automated tests, the engine demo, the running apps in a browser, and the API endpoints.
 
@@ -21,9 +21,9 @@ pnpm check
 Expected result:
 
 - `Tasks: 15 successful, 15 total`
-- 59 passing tests: shared 10, engine 31, API unit 10, API e2e 8
+- 63 passing tests: shared 10, engine 31, API unit 14, API e2e 8
 
-The API e2e tests use your local MongoDB. Each test file creates a temporary `futuria_test_*` database and deletes it afterwards. Your `futuria` database is never touched.
+The API e2e tests use the server in `MONGODB_TEST_URI` (set it in `apps/api/.env` to run them on Atlas), or your local MongoDB if it's unset. Each test file creates a temporary `futuria_test_*` database and deletes it afterwards. Your `futuria` database is never touched. Local MongoDB is faster; on Atlas, expect the e2e step to take a few seconds longer.
 
 ## 2. See the engine work (no servers needed)
 
@@ -98,19 +98,23 @@ Invoke-RestMethod -Method Delete "$api/simulations/$($sim.id)"     # remove it a
 
 ## 7. Look inside the database
 
-1. Open **MongoDB Compass**.
-2. Connect to `mongodb://127.0.0.1:27017`.
+1. Open **MongoDB Compass** (or **Browse Collections** on your cluster in the Atlas web UI).
+2. Connect with the same `MONGODB_URI` string as in `apps/api/.env`.
 3. Open the `futuria` database:
    - `users`: one document per dev user, e.g. `dev:dev-user` on the `free` plan.
    - `simulations`: the sample, plus anything you created. Each stores `model`, `seed` and the full `analysis`.
 
 ## Troubleshooting
 
-| Problem                                | Fix                                                                            |
-| -------------------------------------- | ------------------------------------------------------------------------------ |
-| "API offline" on the web page          | The API isn't running, or it can't reach MongoDB. Check the `pnpm dev` output. |
-| MongoDB stopped                        | Run `Start-Service MongoDB` in a PowerShell window opened as Administrator.    |
-| Port 3000 or 4000 already in use       | Stop the other process, or change `PORT` in `apps/api/.env`.                   |
-| Sample simulation missing              | Run `pnpm --filter @futuria/api db:setup --seed`. It's safe to run again.      |
-| `curl` errors in PowerShell            | Use `curl.exe`, `Invoke-RestMethod` or the browser.                            |
-| Engine or shared changes not picked up | Under `pnpm dev` the watchers rebuild them. Otherwise run `pnpm build`.        |
+| Problem                                   | Fix                                                                                                             |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| "API offline" on the web page             | The API isn't running, or it can't reach MongoDB. Check the `pnpm dev` output.                                  |
+| Atlas: "IP that isn't whitelisted"        | Atlas > Network Access > Add IP Address > Add Current IP Address.                                               |
+| Atlas: "bad auth : authentication failed" | Check the user and password in `MONGODB_URI`; percent-encode `@ : / ? #`.                                       |
+| Atlas: `querySrv ECONNREFUSED`/`ETIMEOUT` | Your DNS can't resolve SRV records. Use another DNS (e.g. 1.1.1.1) or the standard (non-SRV) string from Atlas. |
+| Atlas cluster paused                      | Free clusters pause after long inactivity. Resume it in the Atlas UI.                                           |
+| Local MongoDB stopped (e2e tests)         | Run `Start-Service MongoDB` as Administrator, or set `MONGODB_TEST_URI`.                                        |
+| Port 3000 or 4000 already in use          | Stop the other process, or change `PORT` in `apps/api/.env`.                                                    |
+| Sample simulation missing                 | Run `pnpm --filter @futuria/api db:setup --seed`. It's safe to run again.                                       |
+| `curl` errors in PowerShell               | Use `curl.exe`, `Invoke-RestMethod` or the browser.                                                             |
+| Engine or shared changes not picked up    | Under `pnpm dev` the watchers rebuild them. Otherwise run `pnpm build`.                                         |

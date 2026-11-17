@@ -26,7 +26,7 @@ pnpm check                            # lint + typecheck + test + build (what CI
 pnpm format                           # prettier
 pnpm --filter @futuria/engine test    # engine unit + property tests
 pnpm --filter @futuria/engine demo    # Sara's 3 paths: metrics, sensitivity, action plan, timing
-pnpm --filter @futuria/api test:e2e       # needs local MongoDB (throwaway futuria_test_* databases)
+pnpm --filter @futuria/api test:e2e       # throwaway futuria_test_* databases on MONGODB_TEST_URI or local MongoDB
 pnpm --filter @futuria/api db:setup       # create collections + indexes in the futuria database
 pnpm --filter @futuria/api db:setup --seed  # ...and add Sara's sample simulation for dev-user
 pnpm --filter @futuria/api smoke          # walk every API endpoint against a running API (see docs/TESTING.md)
@@ -34,9 +34,14 @@ pnpm --filter @futuria/api smoke          # walk every API endpoint against a ru
 
 ## Local services
 
-- **MongoDB:** local Windows service (8.3) at `mongodb://127.0.0.1:27017`, no auth, localhost
-  only. The app database is `futuria`. Tests create and drop `futuria_test_*` databases; never
-  point tests at `futuria`. `test/test-app.ts` refuses to drop non-test databases.
+- **MongoDB:** MongoDB Atlas, via `MONGODB_URI` (`mongodb+srv://...`) in `apps/api/.env`. The
+  app database is `futuria`; a URI without a database name gets `futuria`
+  (`src/database/mongo-uri.ts`), never the driver's `test`. A local MongoDB at
+  `mongodb://127.0.0.1:27017` still works as an alternative.
+- **E2E tests:** they create and drop `futuria_test_*` databases on `MONGODB_TEST_URI` (process
+  env or `apps/api/.env`), else local MongoDB. They never read `MONGODB_URI`; never point tests
+  at `futuria`. `test/test-app.ts` refuses to drop non-test databases. CI uses a `mongo:8`
+  service container.
 - **Auth:** with no `CLERK_SECRET_KEY`, the API runs in `AUTH_MODE=dev`. The user comes from the
   `x-dev-user` header (default `dev-user`) and is stored as `dev:<name>`. Dev mode is refused
   when `NODE_ENV=production`.

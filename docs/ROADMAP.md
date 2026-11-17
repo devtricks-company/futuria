@@ -14,8 +14,8 @@ _Explore the Future Before You Live It._
 
 **Phase 2 notes (deviations from the plan below):**
 
-- **Database:** local MongoDB 8.3 (Windows service) at `mongodb://127.0.0.1:27017/futuria`. `pnpm --filter @futuria/api db:setup [--seed]` creates the collections and indexes, and optionally adds Sara's sample.
-- **E2E tests:** they use real MongoDB (one throwaway `futuria_test_*` database per test file) instead of mongodb-memory-server. CI provides a `mongo:8` service container.
+- **Database:** first built on local MongoDB 8.3 (Windows service). On 2026-11-16 it moved to MongoDB Atlas: `MONGODB_URI` is a `mongodb+srv://` string, and a URI without a database name gets `futuria`. `pnpm --filter @futuria/api db:setup [--seed]` creates the collections and indexes, and optionally adds Sara's sample.
+- **E2E tests:** they use real MongoDB (one throwaway `futuria_test_*` database per test file) instead of mongodb-memory-server, on `MONGODB_TEST_URI` (Atlas or anything else) or local MongoDB. CI provides a `mongo:8` service container.
 - **Auth:** Clerk verification is implemented. With no `CLERK_SECRET_KEY`, the API runs in `AUTH_MODE=dev` and trusts an `x-dev-user` header. That mode is refused when `NODE_ENV=production`.
 - **Engine run:** it currently happens synchronously in the request (about 200 ms for Sara). Phase 3 moves it into the Inngest pipeline.
 
