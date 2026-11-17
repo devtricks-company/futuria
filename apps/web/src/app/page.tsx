@@ -2,7 +2,6 @@ import { ArrowRight, Check, ClipboardCheck, MessageSquareText, Sparkles } from '
 import Link from 'next/link';
 import { PLANS, type PlanLimits, SARA_MODEL } from '@futuria/shared';
 import { formatMoney, simulate } from '@futuria/engine';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,6 +37,11 @@ function SaraPreview() {
           $18,000 saved, spends about $3,100 a month. Should she go freelance?
         </p>
       </div>
+      <p className="hidden border-b border-border px-6 py-2 text-xs text-muted sm:grid sm:grid-cols-[1fr_9rem_9rem]">
+        <span>Path</span>
+        <span className="text-right">Chance of running out</span>
+        <span className="text-right">Median savings, month 12</span>
+      </p>
       <ul className="divide-y divide-border">
         {result.paths.map((path) => (
           <li
@@ -56,11 +60,6 @@ function SaraPreview() {
           </li>
         ))}
       </ul>
-      <p className="hidden border-t border-border px-6 py-2 text-xs text-muted sm:grid sm:grid-cols-[1fr_9rem_9rem]">
-        <span>Path</span>
-        <span className="text-right">Chance of running out</span>
-        <span className="text-right">Median savings, month 12</span>
-      </p>
     </Card>
   );
 }
@@ -82,7 +81,6 @@ function PlanCard({ plan, highlight }: { plan: PlanLimits; highlight?: boolean }
     <Card className={highlight ? 'border-accent ring-1 ring-accent' : undefined}>
       <div className="flex items-baseline justify-between gap-2">
         <h3 className="text-lg font-semibold">{plan.name}</h3>
-        {highlight ? <Badge variant="accent">Most popular</Badge> : null}
       </div>
       <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
         ${plan.priceUsdMonthly}
