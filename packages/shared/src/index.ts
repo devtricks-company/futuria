@@ -3,6 +3,8 @@ export * from './decision-model';
 export * from './results';
 export * from './plans';
 export * from './field-labels';
+export * from './field-meta';
 export * from './simulation';
 export * from './ai';
+export * from './profile';
 export { SARA_MODEL } from './fixtures/sara';

@@ -1,5 +1,11 @@
-import { Controller, Get, NotFoundException } from '@nestjs/common';
-import { type MeDto, PLANS } from '@futuria/shared';
+import { Body, Controller, Get, NotFoundException, Put } from '@nestjs/common';
+import {
+  type MeDto,
+  PLANS,
+  type Profile,
+  type ProfileDto,
+  updateProfileRequestSchema,
+} from '@futuria/shared';
 import type { AuthContext } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import { UsersService } from './users.service.js';
@@ -21,5 +27,19 @@ export class UsersController {
       },
       limits: PLANS[user.plan],
     };
+  }
+
+  /** The saved financial baseline that pre-fills the next simulation's questions. */
+  @Get('profile')
+  async profile(@CurrentUser() auth: AuthContext): Promise<ProfileDto> {
+    return { profile: await this.users.getProfile(auth.userId) };
+  }
+
+  @Put('profile')
+  async saveProfile(
+    @CurrentUser() auth: AuthContext,
+    @Body({ schema: updateProfileRequestSchema }) body: Profile,
+  ): Promise<ProfileDto> {
+    return { profile: await this.users.saveProfile(auth.userId, body) };
   }
 }

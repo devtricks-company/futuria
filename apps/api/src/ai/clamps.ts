@@ -3,8 +3,10 @@ import {
   type DecisionModel,
   type Distribution,
   type ProposedPath,
+  FIELD_META,
   decisionModelSchema,
   isDistribution,
+  isFractionUnit,
 } from '@futuria/shared';
 import { AiError } from './ai.errors.js';
 import { type DistOutput, type ModelOutput, pathKey } from './model-output.schema.js';
@@ -22,48 +24,16 @@ interface Rule {
   fraction?: boolean;
 }
 
-/** Bounds by field name. Distribution fields clamp low, likely and high. */
-const RULES: Record<string, Rule> = {
-  // baseline
-  startingCash: { min: -10_000_000, max: 100_000_000 },
-  monthlyExpenses: { min: 0, max: 1_000_000 },
-  annualExpenseGrowth: { min: -0.5, max: 1, fraction: true },
-  currentMonthlyNetSalary: { min: 0, max: 1_000_000 },
-  otherMonthlyIncome: { min: 0, max: 1_000_000 },
-  emergencyFloor: { min: -10_000_000, max: 10_000_000 },
-  // stay / newJob
-  annualRaisePct: { min: -0.1, max: 0.3, fraction: true },
-  annualLayoffProb: { min: 0, max: 0.5, fraction: true },
-  monthsToReemploy: { min: 0, max: 24 },
-  monthsToFindJob: { min: 0, max: 24 },
-  newMonthlyNetSalary: { min: 0, max: 1_000_000 },
-  signOnBonus: { min: -1_000_000, max: 1_000_000 }, // negative: relocation or other one-off cost
-  // freelance (also hybrid.freelance)
-  monthsToFirstClient: { min: 0, max: 24 },
-  hourlyRate: { min: 5, max: 500 },
-  billableHoursPerWeek: { min: 0, max: 60 },
-  rampMonths: { min: 0, max: 24 },
-  initialBookedHoursPerWeek: { min: 0, max: 60 },
-  monthlyClientLossProb: { min: 0, max: 0.5, fraction: true },
-  businessCostsMonthly: { min: 0, max: 100_000 },
-  taxRate: { min: 0, max: 0.6, fraction: true },
-  setupCost: { min: 0, max: 1_000_000 },
-  revenueVolatility: { min: 0, max: 1, fraction: true },
-  // startup
-  monthsToFirstRevenue: { min: 0, max: 36 },
-  startingMrr: { min: 0, max: 1_000_000 },
-  monthlyGrowthRate: { min: -0.3, max: 0.5, fraction: true },
-  monthlyFailureProb: { min: 0, max: 0.3, fraction: true },
-  monthlyBurn: { min: 0, max: 1_000_000 },
-  fallbackMonthlySalary: { min: 0, max: 1_000_000 },
-  probability: { min: 0, max: 1, fraction: true },
-  month: { min: 1, max: 120 },
-  founderMonthlySalary: { min: 0, max: 1_000_000 },
-  // hybrid
-  transitionMonths: { min: 0, max: 24 },
-  transitionSalaryFraction: { min: 0, max: 1, fraction: true },
-  sideHoursPerWeek: { min: 0, max: 40 },
-};
+/**
+ * Bounds by field name, from the shared FIELD_META (the web app's inputs use the same table).
+ * Distribution fields clamp low, likely and high.
+ */
+const RULES: Record<string, Rule> = Object.fromEntries(
+  Object.entries(FIELD_META).map(([key, meta]) => [
+    key,
+    { min: meta.min, max: meta.max, fraction: isFractionUnit(meta.unit) },
+  ]),
+);
 
 const MAX_ASSUMPTIONS = 40;
 

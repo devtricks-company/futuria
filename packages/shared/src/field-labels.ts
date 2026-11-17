@@ -25,6 +25,7 @@ export const FIELD_LABELS: Record<string, string> = {
   monthlyFailureProb: 'Monthly shutdown risk',
   monthlyBurn: 'Monthly business costs',
   fallbackMonthlySalary: 'Fallback job pay',
+  probability: 'Chance of raising funding',
   month: 'Funding month',
   founderMonthlySalary: 'Founder salary after funding',
   monthsToFindJob: 'Months to find the new job',

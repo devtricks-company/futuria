@@ -9,6 +9,7 @@ import {
   type Spread,
   isDistribution,
   labelForField,
+  milestoneMonths,
 } from '@futuria/shared';
 import { getField } from '@futuria/engine';
 
@@ -54,12 +55,8 @@ export interface NarrativeFacts {
   assumptions: { label: string; value: string; source: string; confidence: string }[];
 }
 
-/** Time Machine months: 1/3/6/9/12, then wider steps for longer horizons, always the horizon. */
-export function milestoneMonths(horizon: number): number[] {
-  const months = [1, 3, 6, 9, 12, 18, 24, 36, 48, 60, 90, 120].filter((m) => m <= horizon);
-  if (!months.includes(horizon)) months.push(horizon);
-  return months;
-}
+// Shared with the web app's Time Machine, which shows engine numbers beside each milestone.
+export { milestoneMonths };
 
 const round = (value: number) => Math.round(value);
 
