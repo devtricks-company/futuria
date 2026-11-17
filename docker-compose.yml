@@ -1,0 +1,15 @@
+# Local MongoDB for development (Roadmap Phase 2+).
+#   docker compose up -d
+# Then set MONGODB_URI=mongodb://localhost:27017/futuria in apps/api/.env
+# Alternative without Docker: a free MongoDB Atlas cluster.
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
