@@ -9,13 +9,13 @@ when its ✅ checks pass.
 
 ## Layout
 
-| Path              | What                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------- |
-| `packages/shared` | Zod schemas (`DecisionModel`), engine result types, plan limits, `SARA_MODEL` fixture |
-| `packages/engine` | Pure-TS Monte Carlo engine, used by the browser (Web Worker) and the API              |
-| `packages/config` | Shared tsconfig and ESLint presets                                                    |
-| `apps/api`        | NestJS 12 API (ESM)                                                                   |
-| `apps/web`        | Next.js 16 App Router (Cache Components on), Tailwind 4                               |
+| Path              | What                                                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `packages/shared` | Zod schemas (`DecisionModel`, profile), engine result types, plan limits, `FIELD_META` (units, bounds), `SARA_MODEL` fixture |
+| `packages/engine` | Pure-TS Monte Carlo engine, used by the browser (Web Worker) and the API                                                     |
+| `packages/config` | Shared tsconfig and ESLint presets                                                                                           |
+| `apps/api`        | NestJS 12 API (ESM)                                                                                                          |
+| `apps/web`        | Next.js 16 App Router (Cache Components on), Tailwind 4                                                                      |
 
 ## Commands (run from the repo root)
 
@@ -26,6 +26,8 @@ pnpm check                            # lint + typecheck + test + build (what CI
 pnpm format                           # prettier
 pnpm --filter @futuria/engine test    # engine unit + property tests
 pnpm --filter @futuria/engine demo    # Sara's 3 paths: metrics, sensitivity, action plan, timing
+pnpm --filter @futuria/web test       # web unit tests (pure helpers in src/lib)
+pnpm --filter @futuria/web test:e2e   # Playwright: Sara's journey, desktop + mobile (run `pnpm build` first)
 pnpm --filter @futuria/api test:e2e       # throwaway futuria_test_* databases on MONGODB_TEST_URI or local MongoDB
 pnpm --filter @futuria/api db:setup       # create collections + indexes in the futuria database
 pnpm --filter @futuria/api db:setup --seed  # ...and add Sara's sample simulation for dev-user
@@ -116,6 +118,24 @@ changing `shared` or `engine` outside `pnpm dev`, rebuild them (`pnpm build` or 
     change and run the eval. Every call records an `AiUsageRecord` on `simulation.aiUsage`.
   - Narratives may only state money figures from the facts (`grounding.ts`, checked by evals and
     logged at runtime).
+- **Web app (`apps/web`):**
+  - The browser never calls the API directly: it goes through the same-origin proxy
+    `app/api/backend/[...path]/route.ts` (an endpoint allowlist; add new API routes there). The
+    proxy adds the Clerk token, or the `futuria_dev_user` cookie as `x-dev-user` for
+    `AUTH_MODE=dev`. `API_URL` is server-only.
+  - Clerk is optional (`lib/clerk.ts`): without `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` there is no
+    sign-in UI and the proxy uses the dev identity. CI and the e2e build run this way.
+  - Data fetching is client-side with TanStack Query (`lib/api.ts`, `queryKeys`). Pages are
+    static shells; dynamic `params` are awaited inside `<Suspense>` (Cache Components).
+  - Navigate after a mutation with `useNavigate()` (`lib/navigation.ts`), not bare
+    `router.push`: Clerk's `router.refresh()` on load can swallow a pending push.
+  - Sliders recompute in a Web Worker (`engine/engine.worker.ts`, Comlink) with the stored seed,
+    so an untweaked model reproduces the stored results. `useEngine` keeps only the latest model.
+  - Chart colours: `--series-1..8` in `globals.css` (validated categorical palette; colour follows
+    the path's position in the model). Charts ship a legend and a table view.
+  - Pure logic lives in `src/lib` with Vitest tests; UI flows are covered by Playwright (`e2e/`).
+    The e2e run starts the built API from `apps/web` (so it never reads `apps/api/.env`) on :4100
+    with fixture AI and a `futuria_test_web_e2e` database, and `next start` on :3100.
 - **Run pipeline (`apps/api/src/pipeline`):** `POST /run` and `/renarrate` return 202 and queue
   a run; clients poll `GET /simulations/:id`. Steps (`load`, `engine`, `narrate-<path>`,
   `finalize`) are plain `PipelineService` methods scoped to `pipelineRunId`, so retries are safe
