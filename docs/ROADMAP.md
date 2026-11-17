@@ -4,12 +4,20 @@ _Explore the Future Before You Live It._
 
 ## Progress
 
-| Phase                | Status                                                                                             |
-| -------------------- | -------------------------------------------------------------------------------------------------- |
-| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                             |
-| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms |
-| 2. API core and data | Next                                                                                               |
-| 3–11                 | Not started                                                                                        |
+| Phase                | Status                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                  |
+| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms      |
+| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes) |
+| 3. AI layer          | Next                                                                                                    |
+| 4–11                 | Not started                                                                                             |
+
+**Phase 2 notes (deviations from the plan below):**
+
+- **Database:** local MongoDB 8.3 (Windows service) at `mongodb://127.0.0.1:27017/futuria`. `pnpm --filter @futuria/api db:setup [--seed]` creates the collections and indexes, and optionally adds Sara's sample.
+- **E2E tests:** they use real MongoDB (one throwaway `futuria_test_*` database per test file) instead of mongodb-memory-server. CI provides a `mongo:8` service container.
+- **Auth:** Clerk verification is implemented. With no `CLERK_SECRET_KEY`, the API runs in `AUTH_MODE=dev` and trusts an `x-dev-user` header. That mode is refused when `NODE_ENV=production`.
+- **Engine run:** it currently happens synchronously in the request (about 200 ms for Sara). Phase 3 moves it into the Inngest pipeline.
 
 ## Context
 

@@ -19,22 +19,46 @@ and narrates the results.
 - **Phase 0 (foundations)**: done, except the hosted deploys (they need your Vercel, Railway or
   Fly, and MongoDB Atlas accounts).
 - **Phase 1 (simulation engine)**: done.
+- **Phase 2 (API core and data)**: done, on local MongoDB with dev auth until Clerk keys are added.
 
-Next is Phase 2 (API core and data). See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Next is Phase 3 (AI layer and pipeline). See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Quick start
 
-Requirements: Node 24 and pnpm 11 (`corepack enable`).
+Requirements:
+
+- Node 24
+- pnpm 11 (`corepack enable`)
+- MongoDB running locally on `127.0.0.1:27017`, either as a Windows service or with
+  `docker compose up -d`
 
 ```sh
 pnpm install
-pnpm build                            # build shared packages and apps
-pnpm --filter @futuria/engine demo    # see the engine on the "Sara" example
-pnpm dev                              # web on http://localhost:3000, API on http://localhost:4000
+cp apps/api/.env.example apps/api/.env              # local defaults: dev auth, local MongoDB
+pnpm build                                          # build shared packages and apps
+pnpm --filter @futuria/api db:setup --seed          # create the "futuria" database + Sara sample
+pnpm --filter @futuria/engine demo                  # see the engine on the "Sara" example
+pnpm dev                                            # web :3000, API :4000
 ```
 
-Copy `apps/api/.env.example` to `apps/api/.env` and `apps/web/.env.example` to
-`apps/web/.env.local` before you need non-default settings.
+Try the API (dev auth picks the user from the `x-dev-user` header, default `dev-user`):
+
+```sh
+curl http://localhost:4000/health
+curl http://localhost:4000/me
+curl http://localhost:4000/simulations
+```
+
+| Endpoint                       | Purpose                                                  |
+| ------------------------------ | -------------------------------------------------------- |
+| `GET /health`                  | Public. Engine version and database status               |
+| `GET /me`                      | Current user, plan and limits (created on first request) |
+| `POST /simulations`            | Create from `decisionText` (+ optional `model`)          |
+| `GET /simulations`             | List your simulations                                    |
+| `GET /simulations/:id`         | Full simulation, including results                       |
+| `PATCH /simulations/:id/model` | Replace the decision model (clears old results)          |
+| `POST /simulations/:id/run`    | Run the engine and store the results                     |
+| `DELETE /simulations/:id`      | Delete                                                   |
 
 ## Repository
 
@@ -47,4 +71,5 @@ packages/config   tsconfig / ESLint presets
 docs/ROADMAP.md   step-by-step build guide, MVP to final version
 ```
 
-`pnpm check` runs lint, typecheck, tests and build, the same as CI.
+`pnpm check` runs lint, typecheck, tests and build, the same as CI. For a step-by-step guide to
+running and testing everything locally, see [`docs/TESTING.md`](docs/TESTING.md).

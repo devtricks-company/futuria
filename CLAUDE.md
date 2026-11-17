@@ -26,8 +26,20 @@ pnpm check                            # lint + typecheck + test + build (what CI
 pnpm format                           # prettier
 pnpm --filter @futuria/engine test    # engine unit + property tests
 pnpm --filter @futuria/engine demo    # Sara's 3 paths: metrics, sensitivity, action plan, timing
-pnpm --filter @futuria/api test:e2e
+pnpm --filter @futuria/api test:e2e       # needs local MongoDB (throwaway futuria_test_* databases)
+pnpm --filter @futuria/api db:setup       # create collections + indexes in the futuria database
+pnpm --filter @futuria/api db:setup --seed  # ...and add Sara's sample simulation for dev-user
+pnpm --filter @futuria/api smoke          # walk every API endpoint against a running API (see docs/TESTING.md)
 ```
+
+## Local services
+
+- **MongoDB:** local Windows service (8.3) at `mongodb://127.0.0.1:27017`, no auth, localhost
+  only. The app database is `futuria`. Tests create and drop `futuria_test_*` databases; never
+  point tests at `futuria`. `test/test-app.ts` refuses to drop non-test databases.
+- **Auth:** with no `CLERK_SECRET_KEY`, the API runs in `AUTH_MODE=dev`. The user comes from the
+  `x-dev-user` header (default `dev-user`) and is stored as `dev:<name>`. Dev mode is refused
+  when `NODE_ENV=production`.
 
 Packages are built with tsup to `dist/` (ESM + CJS + d.ts). Apps import the built output, so after
 changing `shared` or `engine` outside `pnpm dev`, rebuild them (`pnpm build` or turbo does it via
@@ -43,7 +55,13 @@ changing `shared` or `engine` outside `pnpm dev`, rebuild them (`pnpm build` or 
 - **NestJS 12 is ESM-only:** relative imports end in `.js`, use `import.meta.dirname`, and tests
   use Vitest (`vi.fn()`). Injected classes must be **value imports**, never `import type`
   (DI reads `emitDecoratorMetadata`). That's why `consistent-type-imports` is off in `apps/api`.
-  Validate requests with Zod through Nest's `StandardSchemaValidationPipe`.
+  Validate requests with Zod via `@Body({ schema })` / `@Param('id', { schema })` (the global
+  `StandardSchemaValidationPipe` from `common/validation.ts`). Request schemas, the status
+  machine and response DTO types live in `packages/shared/src/simulation.ts`.
+- **API conventions:** every route requires auth unless marked `@Public()`. Queries are scoped
+  to the owner, so another user's simulation is a 404. Status changes go through
+  `SimulationsService.transition` (an atomic conditional update using `statusesThatCanReach`).
+  Errors use the `ApiErrorBody` shape `{ statusCode, error, code, message, issues? }`.
 - **Next.js 16 differs from older docs.** Read `apps/web/node_modules/next/dist/docs/` before
   writing Next code. With Cache Components, uncached data (fetches, cookies) must sit inside
   `<Suspense>`.
