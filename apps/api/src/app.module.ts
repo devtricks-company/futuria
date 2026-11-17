@@ -1,9 +1,32 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { AuthModule } from './auth/auth.module.js';
+import { MongoExceptionFilter } from './common/mongo-exception.filter.js';
+import { createValidationPipe } from './common/validation.js';
+import { validateEnv } from './config/env.js';
+import { DatabaseModule } from './database/database.module.js';
 import { HealthController } from './health/health.controller.js';
+import { SimulationsModule } from './simulations/simulations.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
-  imports: [],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      envFilePath: ['.env'],
+      validate: validateEnv,
+    }),
+    DatabaseModule,
+    UsersModule,
+    AuthModule,
+    SimulationsModule,
+  ],
   controllers: [HealthController],
-  providers: [],
+  providers: [
+    { provide: APP_PIPE, useFactory: createValidationPipe },
+    { provide: APP_FILTER, useClass: MongoExceptionFilter },
+  ],
 })
 export class AppModule {}
