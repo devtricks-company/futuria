@@ -1,34 +1,95 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * Theme: light by default, dark from the system setting or the header toggle. An inline script
+ * in the root layout sets data-theme on <html> before first paint (see layout.tsx); without it,
+ * the media query below still follows the system.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 :root {
+  color-scheme: light;
   --background: #f7f7f5;
   --surface: #ffffff;
+  --surface-muted: #f0f0ec;
   --foreground: #1b1b1f;
-  --muted: #6b6b76;
-  --border: #e4e4e0;
+  --muted: #62626d;
+  --border: #e2e2dc;
   --accent: #4f46e5;
+  --accent-foreground: #ffffff;
+  --ring: #6366f1;
+  /* AI estimates and warnings */
+  --estimate: #92400e;
+  --estimate-surface: #fef3c7;
+  --estimate-border: #f59e0b;
+  --danger: #b91c1c;
+  --danger-surface: #fee2e2;
+  --success: #047857;
+  --success-surface: #d1fae5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --background: #0d0d10;
+    --surface: #17171c;
+    --surface-muted: #202027;
+    --foreground: #ededf0;
+    --muted: #a0a0ac;
+    --border: #2c2c34;
+    --accent: #818cf8;
+    --accent-foreground: #0d0d10;
+    --ring: #a5b4fc;
+    --estimate: #fcd34d;
+    --estimate-surface: #3a2a0a;
+    --estimate-border: #b7791f;
+    --danger: #fca5a5;
+    --danger-surface: #3b1214;
+    --success: #6ee7b7;
+    --success-surface: #0f2e24;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --background: #0d0d10;
+  --surface: #17171c;
+  --surface-muted: #202027;
+  --foreground: #ededf0;
+  --muted: #a0a0ac;
+  --border: #2c2c34;
+  --accent: #818cf8;
+  --accent-foreground: #0d0d10;
+  --ring: #a5b4fc;
+  --estimate: #fcd34d;
+  --estimate-surface: #3a2a0a;
+  --estimate-border: #b7791f;
+  --danger: #fca5a5;
+  --danger-surface: #3b1214;
+  --success: #6ee7b7;
+  --success-surface: #0f2e24;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-estimate: var(--estimate);
+  --color-estimate-surface: var(--estimate-surface);
+  --color-estimate-border: var(--estimate-border);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0d0d10;
-    --surface: #17171c;
-    --foreground: #ededf0;
-    --muted: #9a9aa6;
-    --border: #2a2a31;
-    --accent: #818cf8;
-  }
 }
 
 body {
