@@ -29,7 +29,7 @@ export const FIELD_LABELS: Record<string, string> = {
   founderMonthlySalary: 'Founder salary after funding',
   monthsToFindJob: 'Months to find the new job',
   newMonthlyNetSalary: 'New take-home pay',
-  signOnBonus: 'Sign-on bonus',
+  signOnBonus: 'Sign-on bonus or one-off cost',
   transitionMonths: 'Months combining job and freelancing',
   transitionSalaryFraction: 'Share of salary kept during transition',
   sideHoursPerWeek: 'Side freelance hours per week',

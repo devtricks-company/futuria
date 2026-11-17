@@ -1,9 +1,12 @@
 import { Prop, Schema, SchemaFactory, raw } from '@nestjs/mongoose';
 import { type HydratedDocument, Types } from 'mongoose';
 import {
+  type AiUsageRecord,
   type DecisionModel,
   type FullAnalysis,
+  type PathNarrative,
   SIMULATION_STATUSES,
+  type SimulationIntake,
   type SimulationStatus,
 } from '@futuria/shared';
 
@@ -25,9 +28,9 @@ export class Simulation {
   @Prop({ type: String, enum: SIMULATION_STATUSES, default: 'draft' })
   status: SimulationStatus;
 
-  /** AI intake questions and answers (Phase 3). */
+  /** AI intake: Claude's questions and proposed paths, the routing, and the person's answers. */
   @Prop({ type: Object, default: null })
-  intake: Record<string, unknown> | null;
+  intake: SimulationIntake | null;
 
   @Prop({ type: Object, default: null })
   model: DecisionModel | null;
@@ -39,9 +42,9 @@ export class Simulation {
   @Prop({ type: Object, default: null })
   analysis: FullAnalysis | null;
 
-  /** Time Machine narrative per path (Phase 3). */
+  /** Time Machine narrative and action plan, keyed by path id. */
   @Prop({ type: Object, default: null })
-  narrative: Record<string, unknown> | null;
+  narrative: Record<string, PathNarrative> | null;
 
   @Prop({ type: String, default: null })
   engineVersion: string | null;
@@ -60,9 +63,13 @@ export class Simulation {
   )
   share: { slug: string | null; isPublic: boolean };
 
-  /** Per-call Claude usage and cost records (Phase 3). */
+  /** Per-call Claude usage and cost records. */
   @Prop({ type: [Object], default: [] })
-  aiUsage: Record<string, unknown>[];
+  aiUsage: AiUsageRecord[];
+
+  /** Id of the pipeline run that owns the simulation; stale runs can't overwrite newer ones. */
+  @Prop({ type: String, default: null })
+  pipelineRunId: string | null;
 
   @Prop({ type: String, default: null })
   promptVersion: string | null;

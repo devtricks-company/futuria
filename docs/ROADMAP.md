@@ -4,13 +4,13 @@ _Explore the Future Before You Live It._
 
 ## Progress
 
-| Phase                | Status                                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------------------------- |
-| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                  |
-| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms      |
-| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes) |
-| 3. AI layer          | Next                                                                                                    |
-| 4–11                 | Not started                                                                                             |
+| Phase                | Status                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                    |
+| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms        |
+| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)   |
+| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open |
+| 4–11                 | Not started                                                                                               |
 
 **Phase 2 notes (deviations from the plan below):**
 
@@ -18,6 +18,31 @@ _Explore the Future Before You Live It._
 - **E2E tests:** they use real MongoDB (one throwaway `futuria_test_*` database per test file) instead of mongodb-memory-server, on `MONGODB_TEST_URI` (Atlas or anything else) or local MongoDB. CI provides a `mongo:8` service container.
 - **Auth:** Clerk verification is implemented. With no `CLERK_SECRET_KEY`, the API runs in `AUTH_MODE=dev` and trusts an `x-dev-user` header. That mode is refused when `NODE_ENV=production`.
 - **Engine run:** it currently happens synchronously in the request (about 200 ms for Sara). Phase 3 moves it into the Inngest pipeline.
+
+**Phase 3 status and notes (2026-11-17):**
+
+- **Done:** `AiProvider` with `AnthropicAiProvider` and `FixtureAiProvider`; versioned prompts with the Career Leap domain prompt cached; sanity clamps; the intake → answers → model flow; the Inngest `simulation-run` function mounted at `/api/inngest`; usage and cost logging per call; the eval harness (30 personas); the gateway probe; the fixture recorder. Verified with 107 automated tests, a fixture-mode eval dry run (30/30), and the smoke test end to end through the Inngest Dev Server (`COMPLETED` runs).
+- **Real Claude, through the gateway (2026-11-17):**
+  - The probe passed every check: Messages API, effort, structured outputs, refusal fallback, and prompt caching (3,159 cached tokens on a repeat).
+  - The smoke test ran Sara's full journey: intake 11 s, model 35 s, run with three stories 41 s.
+  - **Full eval:** all 30 personas pass every hard check, and 140 of 141 soft checks pass. The one soft miss is a laid-off persona with no pay to ask about, which is correct. It cost $9.20 for 25 simulations and 5 intakes.
+    - The first scoring was 27/30. All three failures were checker false positives: rounding to $50, rounding down ("savings pass $27.7k" for 27,763), and the contract term "guaranteed minimums". The checks were fixed and the same outputs re-scored with `--replay`.
+    - Routing was right in every case: out of scope, crisis, and burnout that must not be flagged as a crisis.
+- **Measured cost:** **$0.367 per 3-path simulation** (full eval, 25 simulations; individual runs $0.22–0.44). That breaks down as intake $0.021, model $0.111, and narrative $0.082 per path. Most of it is output tokens; prompt caching read about 530k tokens across the eval. At the planned Pro quota (20 simulations at $12/mo), a fully used plan costs about $7.40 in AI, about 62% of revenue against the 30% target. The levers (lower narrative effort, a cheaper narrative model, a smaller quota) are your decision.
+- **Fixed by real testing:**
+  - The decision model was too large for a structured-output grammar. It now uses a JSON Schema in the prompt plus Zod validation (see `CLAUDE.md`).
+  - The grounding check misread figures at the end of sentences and natural rounding.
+  - Narratives said "no risk" when the engine reported 0%; the prompt now forbids it.
+  - Intake `informs` names are now restricted to real model fields.
+  - `signOnBonus` may be negative, for relocation and similar one-off costs.
+- **Fixtures:** Sara's real intake and model outputs are recorded in `apps/api/fixtures/ai/`, so fixture mode replays them for her exact sentence.
+- **Still open (a decision, not a ✅ blocker):** the Pro quota and price, given the cost above.
+- **Gateway:** Claude calls can go through a gateway (`ANTHROPIC_BASE_URL`, plus `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN`). If the gateway bills differently, the logged costs are list-price estimates.
+- **Pipeline modes:** besides Inngest, `PIPELINE_MODE=inline` runs the same steps in the API process. Tests and quick local runs use it; production refuses it. The `load` step claims the run, and every step is scoped to a `pipelineRunId`, so stale runs can't overwrite newer state.
+- **Fixtures:** without a matching recording, fixture mode returns deterministic synthetic output, so tests and offline UI work for any input. Narratives depend on each simulation's random seed, so they are always synthetic in fixture mode.
+- **Status machine:** runs go `queued → simulating → narrating → ready`; `POST /run` now answers 202. A story refresh (`POST /renarrate`) goes `queued → narrating → ready`. Out-of-scope and crisis intakes stay `draft`, with `intake.routing` recorded.
+- **Partial stories:** if Claude refuses one path's story, the run still finishes with the engine results and an `error` note. Retryable failures use the Inngest retries, then mark the run `failed`.
+- **Not gated yet:** "story refresh" is a Pro feature in `plans.ts`, but `/renarrate` isn't plan-gated until Phase 5 (`PlanGuard`).
 
 ## Context
 
@@ -376,8 +401,8 @@ Cross-cutting concerns:
 | Layer      | How                                                                                                                      |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Engine     | `pnpm --filter engine test` (Vitest + fast-check invariants) and `pnpm --filter engine demo` (Sara's numbers and timing) |
-| API        | `pnpm --filter api test:e2e` (supertest + mongodb-memory-server, `AI_MODE=fixture`)                                      |
-| AI quality | `pnpm --filter api eval`: about 30 personas checked for schema, range and grounding. Real API, run manually.             |
+| API        | `pnpm --filter @futuria/api test:e2e` (supertest + throwaway MongoDB databases, `AI_MODE=fixture`, inline pipeline)      |
+| AI quality | `pnpm eval --yes`: 30 personas checked for schema, ranges, routing and grounding. Real API, run manually.                |
 | Pipeline   | Inngest Dev Server (`npx inngest-cli@latest dev`): watch `simulation-run` steps, retries and failures                    |
 | Web        | `pnpm --filter web test:e2e`: Playwright test of Sara's full journey in fixture mode, on desktop and mobile viewports    |
 | Billing    | Stripe test mode, `stripe listen --forward-to localhost:<api>/billing/webhook`, test cards                               |

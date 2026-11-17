@@ -34,6 +34,64 @@ describe('validateEnv', () => {
     expect(env.WEB_ORIGINS).toEqual(['http://a.test', 'https://b.test']);
   });
 
+  it('uses fixture AI and the inline pipeline until credentials are configured', () => {
+    expect(validateEnv({})).toMatchObject({
+      AI_MODE: 'fixture',
+      PIPELINE_MODE: 'inline',
+      AI_MODEL: 'claude-opus-5-5',
+      AI_REFUSAL_FALLBACK: true,
+      AI_PROMPT_CACHE: true,
+      INNGEST_DEV: false,
+    });
+  });
+
+  it('switches to real Claude with a key or token, optionally through a gateway', () => {
+    expect(validateEnv({ ANTHROPIC_API_KEY: 'sk-ant-x' }).AI_MODE).toBe('anthropic');
+    const gateway = validateEnv({
+      ANTHROPIC_AUTH_TOKEN: 'tok',
+      ANTHROPIC_BASE_URL: 'https://gateway.example.com/',
+      AI_REFUSAL_FALLBACK: 'false',
+      AI_PROMPT_CACHE: '0',
+    });
+    expect(gateway).toMatchObject({
+      AI_MODE: 'anthropic',
+      ANTHROPIC_BASE_URL: 'https://gateway.example.com',
+      AI_REFUSAL_FALLBACK: false,
+      AI_PROMPT_CACHE: false,
+    });
+    expect(validateEnv({ ANTHROPIC_API_KEY: '  ' }).AI_MODE).toBe('fixture');
+    expect(() => validateEnv({ AI_MODE: 'anthropic' })).toThrow(/requires ANTHROPIC_API_KEY/);
+    expect(() => validateEnv({ ANTHROPIC_BASE_URL: 'not a url' })).toThrow(/Invalid environment/);
+    expect(() => validateEnv({ AI_PROMPT_CACHE: 'maybe' })).toThrow(/true, false, 1 or 0/);
+  });
+
+  it('uses Inngest with the Dev Server or cloud keys', () => {
+    expect(validateEnv({ INNGEST_DEV: '1' }).PIPELINE_MODE).toBe('inngest');
+    expect(
+      validateEnv({ INNGEST_EVENT_KEY: 'evt', INNGEST_SIGNING_KEY: 'signkey-x' }).PIPELINE_MODE,
+    ).toBe('inngest');
+    expect(() => validateEnv({ PIPELINE_MODE: 'inngest' })).toThrow(/INNGEST_DEV=1/);
+  });
+
+  it('refuses development shortcuts in production', () => {
+    const prod = { NODE_ENV: 'production', CLERK_SECRET_KEY: 'sk_live_x' };
+    expect(() => validateEnv(prod)).toThrow(/AI_MODE=fixture is not allowed/);
+    expect(() => validateEnv({ ...prod, ANTHROPIC_API_KEY: 'k' })).toThrow(
+      /PIPELINE_MODE=inline is not allowed/,
+    );
+    const ok = validateEnv({
+      ...prod,
+      ANTHROPIC_API_KEY: 'k',
+      INNGEST_EVENT_KEY: 'evt',
+      INNGEST_SIGNING_KEY: 'signkey-x',
+    });
+    expect(ok).toMatchObject({
+      AUTH_MODE: 'clerk',
+      AI_MODE: 'anthropic',
+      PIPELINE_MODE: 'inngest',
+    });
+  });
+
   it('refuses dev auth in production and Clerk mode without keys', () => {
     expect(() => validateEnv({ NODE_ENV: 'production' })).toThrow(/not allowed in production/);
     expect(() => validateEnv({ AUTH_MODE: 'clerk' })).toThrow(/requires CLERK_SECRET_KEY/);

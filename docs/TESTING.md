@@ -5,8 +5,11 @@ What exists so far:
 - **Phase 0:** the monorepo and a status page
 - **Phase 1:** the simulation engine
 - **Phase 2:** the NestJS API on the `futuria` database in your MongoDB Atlas cluster
+- **Phase 3:** the AI layer (intake, model, narrative) and the run pipeline (Inngest, or inline)
 
-There's no simulation UI yet (that's Phase 4), so you test in four layers: automated tests, the engine demo, the running apps in a browser, and the API endpoints.
+There's no simulation UI yet (that's Phase 4), so you test in layers: automated tests, the engine demo, the running apps in a browser, the API endpoints, and (with credentials) real Claude.
+
+Without Claude credentials the API uses **fixture AI**: realistic stand-in answers, no API calls, no cost. `GET /health` shows which mode you're in (`"ai":"fixture"` or `"anthropic"`, `"pipeline":"inline"` or `"inngest"`).
 
 Run everything from `F:\futuria` in PowerShell or the VS Code terminal.
 
@@ -21,9 +24,11 @@ pnpm check
 Expected result:
 
 - `Tasks: 15 successful, 15 total`
-- 63 passing tests: shared 10, engine 31, API unit 14, API e2e 8
+- 107 passing tests: shared 13, engine 31, API unit 46, API e2e 17
 
 The API e2e tests use the server in `MONGODB_TEST_URI` (set it in `apps/api/.env` to run them on Atlas), or your local MongoDB if it's unset. Each test file creates a temporary `futuria_test_*` database and deletes it afterwards. Your `futuria` database is never touched. Local MongoDB is faster; on Atlas, expect the e2e step to take a few seconds longer.
+
+The e2e tests always use fixture AI and the inline pipeline, even if your `.env` has Claude or Inngest settings. One red `ERROR ... Inline run ... failed` line in the output is expected: a test checks that a failing run is reported correctly.
 
 ## 2. See the engine work (no servers needed)
 
@@ -65,22 +70,27 @@ The browser counts as `dev-user` because the API runs in dev auth mode until Cle
 pnpm --filter @futuria/api smoke
 ```
 
-The script runs through every endpoint, in order:
+The script walks Sara's journey through every endpoint, in order:
 
-1. Health check
+1. Health check (shows the AI and pipeline modes)
 2. Your user (`/me`)
-3. Create a draft simulation
-4. Try to run it without a model (expects a 409)
-5. Add Sara's model
-6. Run the simulation
-7. Print a results table, the biggest driver, and the best action
-8. Check that another user can't see it (expects a 404)
-9. List your simulations
+3. A simulation without a model can't run (expects a 409)
+4. Intake: Sara's sentence becomes questions and proposed paths
+5. Answers: accepts every default
+6. Model: built from the answers, with the AI's estimates and their reasons
+7. Model edit round trip (`PATCH /model`)
+8. Run: `202 queued`, then it polls until `ready` and prints each status change
+9. A results table, the biggest driver, the Time Machine for the riskiest path, and the top action
+10. Check that another user can't see it (expects a 404)
+11. List your simulations
 
 Options:
 
 - `--cleanup` deletes the new simulation at the end.
+- `--renarrate` also refreshes the story (`POST /renarrate`).
 - `--user alice` acts as a different dev user.
+
+With `"ai":"anthropic"` the script makes real Claude calls: one full simulation, about $0.35–0.45. The intake and model steps take up to a minute each, and the run up to a couple of minutes.
 
 It exits with an error if any response is unexpected. The privacy check creates a dev user called `bob` (or `carol`) in the database the first time it runs.
 
@@ -96,7 +106,26 @@ Invoke-RestMethod "$api/simulations" -Headers @{ 'x-dev-user' = 'bob' }   # bob 
 Invoke-RestMethod -Method Delete "$api/simulations/$($sim.id)"     # remove it again
 ```
 
-## 7. Look inside the database
+## 7. Watch the pipeline in the Inngest Dev Server
+
+By default runs happen inside the API process (`pipeline: inline`). To use Inngest locally, as production will:
+
+1. Add `INNGEST_DEV=1` to `apps/api/.env` and restart `pnpm dev`.
+2. In another terminal: `npx inngest-cli@latest dev -u http://localhost:4000/api/inngest`
+3. Open http://localhost:8288, then run the smoke test. Under **Runs** you'll see `simulation-run` with its steps: `load`, `engine`, one `narrate-<path>` per path, and `finalize`.
+
+If a run stays `queued`, the Dev Server isn't running or can't reach the API.
+
+## 8. Real Claude (through your gateway)
+
+1. In `apps/api/.env` set `ANTHROPIC_BASE_URL` (gateway root, no `/v1`) and `ANTHROPIC_API_KEY`. If your gateway expects `Authorization: Bearer`, use `ANTHROPIC_AUTH_TOKEN` instead.
+2. `pnpm --filter @futuria/api ai:probe`: about 7 tiny requests (a few cents). It checks that the gateway speaks the Anthropic Messages API and passes through structured outputs, effort, the refusal fallback and prompt caching. Then it prints the `.env` switches to use.
+3. `pnpm eval --fixture`: free dry run of the eval harness.
+4. `pnpm eval --yes`: 30 personas against real Claude (about $10). It prints pass/fail per persona and the **cost per simulation**. Reports go to `apps/api/evals/results/` (gitignored).
+5. After changing a check, `pnpm eval --replay evals/results/<file>.json` re-scores a saved run without calling Claude (the path is relative to `apps/api`).
+6. `pnpm --filter @futuria/api fixtures:record --yes`: saves Sara's real intake and model outputs (about $0.10–0.20) so fixture mode replays them. Commit the files under `apps/api/fixtures/ai/`.
+
+## 9. Look inside the database
 
 1. Open **MongoDB Compass** (or **Browse Collections** on your cluster in the Atlas web UI).
 2. Connect with the same `MONGODB_URI` string as in `apps/api/.env`.
@@ -118,3 +147,6 @@ Invoke-RestMethod -Method Delete "$api/simulations/$($sim.id)"     # remove it a
 | Sample simulation missing                 | Run `pnpm --filter @futuria/api db:setup --seed`. It's safe to run again.                                       |
 | `curl` errors in PowerShell               | Use `curl.exe`, `Invoke-RestMethod` or the browser.                                                             |
 | Engine or shared changes not picked up    | Under `pnpm dev` the watchers rebuild them. Otherwise run `pnpm build`.                                         |
+| Run stuck in `queued`                     | `PIPELINE_MODE=inngest` without the Dev Server running. Start it (section 7) or remove `INNGEST_DEV`.           |
+| `ai_misconfigured` (502) on intake        | Claude rejected the key, URL, model or a feature. Run `ai:probe` and apply the switches it suggests.            |
+| API won't start: `requires ANTHROPIC_...` | `AI_MODE=anthropic` without a key. Add `ANTHROPIC_API_KEY` or remove `AI_MODE`.                                 |

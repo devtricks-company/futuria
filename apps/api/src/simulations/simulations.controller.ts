@@ -1,10 +1,14 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import {
   type CreateSimulationRequest,
+  type IntakeAnswersRequest,
+  type IntakeRequest,
   type SimulationDto,
   type SimulationSummaryDto,
   type UpdateModelRequest,
   createSimulationRequestSchema,
+  intakeAnswersRequestSchema,
+  intakeRequestSchema,
   objectIdSchema,
   updateModelRequestSchema,
 } from '@futuria/shared';
@@ -24,6 +28,15 @@ export class SimulationsController {
     return this.simulations.create(auth, body);
   }
 
+  /** Claude analyzes a free-text decision: scope, safety, questions and proposed paths. */
+  @Post('intake')
+  intake(
+    @CurrentUser() auth: AuthContext,
+    @Body({ schema: intakeRequestSchema }) body: IntakeRequest,
+  ): Promise<SimulationDto> {
+    return this.simulations.intake(auth, body);
+  }
+
   @Get()
   list(@CurrentUser() auth: AuthContext): Promise<SimulationSummaryDto[]> {
     return this.simulations.list(auth);
@@ -37,6 +50,26 @@ export class SimulationsController {
     return this.simulations.get(auth, id);
   }
 
+  @Patch(':id/answers')
+  saveAnswers(
+    @CurrentUser() auth: AuthContext,
+    @Param('id', { schema: objectIdSchema }) id: string,
+    @Body({ schema: intakeAnswersRequestSchema }) body: IntakeAnswersRequest,
+  ): Promise<SimulationDto> {
+    return this.simulations.saveAnswers(auth, id, body);
+  }
+
+  /** Claude builds the decision model from the intake answers (then clamped server-side). */
+  @Post(':id/model')
+  @HttpCode(200)
+  buildModel(
+    @CurrentUser() auth: AuthContext,
+    @Param('id', { schema: objectIdSchema }) id: string,
+  ): Promise<SimulationDto> {
+    return this.simulations.buildModel(auth, id);
+  }
+
+  /** Replace the model with an edited one (assumptions review, sliders). */
   @Patch(':id/model')
   updateModel(
     @CurrentUser() auth: AuthContext,
@@ -46,13 +79,24 @@ export class SimulationsController {
     return this.simulations.updateModel(auth, id, body.model);
   }
 
+  /** Queue the pipeline (engine + narrative). Poll GET /simulations/:id for progress. */
   @Post(':id/run')
-  @HttpCode(200)
+  @HttpCode(202)
   run(
     @CurrentUser() auth: AuthContext,
     @Param('id', { schema: objectIdSchema }) id: string,
   ): Promise<SimulationDto> {
     return this.simulations.run(auth, id);
+  }
+
+  /** Queue a story refresh from the existing engine results. */
+  @Post(':id/renarrate')
+  @HttpCode(202)
+  renarrate(
+    @CurrentUser() auth: AuthContext,
+    @Param('id', { schema: objectIdSchema }) id: string,
+  ): Promise<SimulationDto> {
+    return this.simulations.renarrate(auth, id);
   }
 
   @Delete(':id')
