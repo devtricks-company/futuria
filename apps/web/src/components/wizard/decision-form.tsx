@@ -46,7 +46,7 @@ export function DecisionForm() {
         if (trimmed.length >= MIN) intake.mutate(trimmed);
       }}
     >
-      <Card className="flex flex-col gap-3">
+      <Card className="flex flex-col gap-3 shadow-pop">
         <Label htmlFor="decision" className="text-base">
           What decision are you thinking about?
         </Label>
@@ -54,25 +54,28 @@ export function DecisionForm() {
           Describe it the way you would to a friend. Leave out names and anything that identifies
           you.
         </p>
-        <Textarea
-          id="decision"
-          value={text}
-          onChange={(event) => setText(event.target.value.slice(0, MAX))}
-          placeholder="What if I quit my job to…"
-          rows={4}
-          autoFocus
-          required
-          minLength={MIN}
-          maxLength={MAX}
-        />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-muted tabular-nums">
-            {trimmed.length}/{MAX}
-          </span>
-          <Button type="submit" disabled={trimmed.length < MIN}>
-            Continue
-            <ArrowRight />
-          </Button>
+        <div className="rounded-2xl border border-border bg-background/60 transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-4 focus-within:ring-ring/20 hover:border-border-strong">
+          <Textarea
+            id="decision"
+            value={text}
+            onChange={(event) => setText(event.target.value.slice(0, MAX))}
+            placeholder="What if I quit my job to…"
+            rows={4}
+            autoFocus
+            required
+            minLength={MIN}
+            maxLength={MAX}
+            className="min-h-32 resize-none border-0 bg-transparent px-4 pt-3.5 text-base shadow-none hover:border-0 focus-visible:ring-0 sm:text-base"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 pb-3">
+            <span className="pl-1 text-xs text-muted tabular-nums">
+              {trimmed.length}/{MAX}
+            </span>
+            <Button type="submit" disabled={trimmed.length < MIN}>
+              Continue
+              <ArrowRight />
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -90,7 +93,7 @@ export function DecisionForm() {
               <button
                 type="button"
                 onClick={() => setText(example.text)}
-                className="rounded-full border border-border bg-surface px-3 py-1.5 text-sm transition-colors hover:border-accent hover:text-accent"
+                className="rounded-full border border-border bg-surface px-3.5 py-1.5 text-sm shadow-card transition-colors hover:border-accent/50 hover:bg-accent-soft"
               >
                 {example.label}
               </button>

@@ -1,7 +1,15 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import {
+  ArrowLeft,
+  CalendarRange,
+  Dices,
+  GitBranch,
+  Pencil,
+  RefreshCw,
+  SlidersHorizontal,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -201,13 +209,13 @@ function Results({ simulation }: { simulation: SimulationDto }) {
       value={selectedPathId}
       onValueChange={setPathId}
       aria-label="Path"
-      className="flex-wrap gap-1.5 rounded-none border-0 bg-transparent p-0 sm:w-full"
+      className="flex-wrap gap-2 rounded-none border-0 bg-transparent p-0 sm:w-full"
     >
       {result.paths.map((p) => (
         <SegmentedItem
           key={p.pathId}
           value={p.pathId}
-          className="flex-none gap-1.5 border border-border bg-surface data-[state=on]:border-foreground"
+          className="h-9 flex-none gap-2 border border-border bg-surface px-3.5 shadow-card hover:border-border-strong data-[state=on]:border-accent data-[state=on]:bg-accent-soft data-[state=on]:shadow-none"
         >
           <PathSwatch index={colorIndex[p.pathId] ?? 0} />
           {p.name}
@@ -219,9 +227,18 @@ function Results({ simulation }: { simulation: SimulationDto }) {
   return (
     <div className="grid gap-8 pb-20 lg:grid-cols-[minmax(0,1fr)_20rem] lg:pb-0">
       <div className="flex min-w-0 flex-col gap-6">
-        <header className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{simulation.title}</h1>
-          <p className="text-muted">{simulation.decisionText}</p>
+        <header className="flex flex-col gap-3">
+          <Link
+            href="/dashboard"
+            className="inline-flex w-fit items-center gap-1.5 text-sm text-muted transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" aria-hidden />
+            All simulations
+          </Link>
+          <h1 className="font-display text-3xl leading-[1.1] sm:text-4xl">{simulation.title}</h1>
+          <p className="max-w-2xl text-base text-muted sm:text-lg">
+            &ldquo;{simulation.decisionText}&rdquo;
+          </p>
         </header>
 
         {busy ? (
@@ -266,10 +283,25 @@ function Results({ simulation }: { simulation: SimulationDto }) {
           </Notice>
         ) : null}
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted">
-            1,000 simulated futures per path over {horizon} months
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <ul
+            className="flex flex-wrap gap-2 text-xs text-muted"
+            aria-label="About this simulation"
+          >
+            {[
+              { icon: Dices, text: '1,000 simulated futures per path' },
+              { icon: CalendarRange, text: `${horizon} months` },
+              { icon: GitBranch, text: `${result.paths.length} paths` },
+            ].map(({ icon: Icon, text }) => (
+              <li
+                key={text}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/70 px-2.5 py-1"
+              >
+                <Icon className="size-3.5" aria-hidden />
+                {text}
+              </li>
+            ))}
+          </ul>
           <Segmented
             value={scenario}
             onValueChange={(v) => setScenario(v as ScenarioKey)}
@@ -408,9 +440,11 @@ function Results({ simulation }: { simulation: SimulationDto }) {
 
       {/* Desktop: the sliders stay beside the charts. */}
       <aside className="hidden lg:block">
-        <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-2xl border border-border bg-surface p-5">
-          <h2 className="mb-4 flex items-center gap-2 font-semibold">
-            <SlidersHorizontal className="size-4" aria-hidden />
+        <div className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-2xl border border-border bg-surface/85 p-5 shadow-pop backdrop-blur-xl">
+          <h2 className="mb-4 flex items-center gap-3 font-semibold">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
+              <SlidersHorizontal className="size-4" aria-hidden />
+            </span>
             Tweak the future
           </h2>
           {tweakPanel('desk')}
@@ -421,7 +455,7 @@ function Results({ simulation }: { simulation: SimulationDto }) {
       <div className="fixed right-4 bottom-4 z-30 lg:hidden">
         <Sheet modal={false}>
           <SheetTrigger asChild>
-            <Button size="lg" className="shadow-lg">
+            <Button size="lg">
               <SlidersHorizontal />
               Tweak
             </Button>

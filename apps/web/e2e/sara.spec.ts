@@ -18,11 +18,11 @@ async function freelanceRisk(page: Page): Promise<string> {
 }
 
 test('Sara simulates quitting to freelance, end to end', async ({ page, isMobile }) => {
-  // 1. Landing: the hero input.
+  // 1. Landing: the hero input (the page repeats the same form at the end).
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /explore the future/i })).toBeVisible();
-  await page.getByLabel('Your decision').fill(SARA);
-  await page.getByRole('button', { name: 'Simulate my futures' }).click();
+  await expect(page.getByRole('heading', { name: /play out a career move/i })).toBeVisible();
+  await page.getByLabel('Your decision').first().fill(SARA);
+  await page.getByRole('button', { name: 'Simulate my futures' }).first().click();
 
   // 2. Decision step, pre-filled from the landing page.
   await expect(page).toHaveURL(/\/new\?q=/);

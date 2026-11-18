@@ -128,8 +128,8 @@ function QuestionsStep({
       }}
     >
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">A few questions</h1>
-        <p className="mt-1 text-muted">
+        <h1 className="font-display text-3xl leading-[1.1] sm:text-4xl">A few questions</h1>
+        <p className="mt-2 text-muted">
           We filled in typical answers. Change anything that doesn&apos;t fit you; rough numbers are
           fine.
         </p>
@@ -203,8 +203,8 @@ function PathsStep({
       }}
     >
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">The futures to compare</h1>
-        <p className="mt-1 text-muted">
+        <h1 className="font-display text-3xl leading-[1.1] sm:text-4xl">The futures to compare</h1>
+        <p className="mt-2 text-muted">
           Each path is one way your decision could go. Rename them, remove one, or add another (up
           to {maxPaths} on your plan).
         </p>

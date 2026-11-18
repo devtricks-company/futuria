@@ -2,97 +2,40 @@
 @import 'tw-animate-css';
 
 /*
- * Theme: light by default, dark from the system setting or the header toggle. An inline script
- * in the root layout sets data-theme on <html> before first paint (see layout.tsx); without it,
- * the media query below still follows the system.
+ * Theme: dark by default (the brand look), light from the header toggle. An inline script in the
+ * root layout sets data-theme on <html> before first paint (see lib/theme.ts); without it the
+ * page stays dark.
+ *
+ * Look: deep green-black ink, mint-white text and an emerald-to-lime brand gradient. Buttons on
+ * the gradient carry dark ink text (white on this green fails contrast). One family, Plus Jakarta
+ * Sans: bold, tightly tracked headings; numbers always tabular.
  */
-@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@custom-variant dark (&:where(html:not([data-theme='light']), html:not([data-theme='light']) *));
 
 :root {
-  color-scheme: light;
-  --background: #f7f7f5;
-  --surface: #ffffff;
-  --surface-muted: #f0f0ec;
-  --foreground: #1b1b1f;
-  --muted: #62626d;
-  --border: #e2e2dc;
-  --accent: #4f46e5;
-  --accent-foreground: #ffffff;
-  --ring: #6366f1;
-  /* AI estimates and warnings */
-  --estimate: #92400e;
-  --estimate-surface: #fef3c7;
-  --estimate-border: #f59e0b;
-  --danger: #b91c1c;
-  --danger-surface: #fee2e2;
-  --success: #047857;
-  --success-surface: #d1fae5;
-  /* Path colours (validated categorical palette; slots 1-3 also pass all-pairs) */
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #008300;
-  --series-7: #6250d6;
-  --series-8: #e34948;
-  /* Diverging poles for "what matters most" (better / worse than the baseline) */
-  --better: #2a78d6;
-  --worse: #e34948;
-  --grid: #ecece8;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    color-scheme: dark;
-    --background: #0d0d10;
-    --surface: #17171c;
-    --surface-muted: #202027;
-    --foreground: #ededf0;
-    --muted: #a0a0ac;
-    --border: #2c2c34;
-    --accent: #818cf8;
-    --accent-foreground: #0d0d10;
-    --ring: #a5b4fc;
-    --estimate: #fcd34d;
-    --estimate-surface: #3a2a0a;
-    --estimate-border: #b7791f;
-    --danger: #fca5a5;
-    --danger-surface: #3b1214;
-    --success: #6ee7b7;
-    --success-surface: #0f2e24;
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #0ca30c;
-    --series-7: #9085e9;
-    --series-8: #e66767;
-    --better: #3987e5;
-    --worse: #e66767;
-    --grid: #26262d;
-  }
-}
-
-:root[data-theme='dark'] {
   color-scheme: dark;
-  --background: #0d0d10;
-  --surface: #17171c;
-  --surface-muted: #202027;
-  --foreground: #ededf0;
-  --muted: #a0a0ac;
-  --border: #2c2c34;
-  --accent: #818cf8;
-  --accent-foreground: #0d0d10;
-  --ring: #a5b4fc;
+  --background: #03120f;
+  --surface: #0a1d1a;
+  --surface-muted: #102824;
+  --foreground: #ecf6f1;
+  --muted: #93aba4;
+  --border: #183330;
+  --border-strong: #26493f;
+  --accent: #2fe08d;
+  --accent-foreground: #03140d;
+  --accent-soft: #0c2c22;
+  --ring: #3fe39a;
+  /* Ink on the brand gradient (buttons, the logo tile). Same in both themes. */
+  --on-brand: #03140d;
+  /* AI estimates and warnings */
   --estimate: #fcd34d;
-  --estimate-surface: #3a2a0a;
+  --estimate-surface: #33280b;
   --estimate-border: #b7791f;
   --danger: #fca5a5;
-  --danger-surface: #3b1214;
+  --danger-surface: #3a1416;
   --success: #6ee7b7;
-  --success-surface: #0f2e24;
+  --success-surface: #0c2e22;
+  /* Path colours (validated categorical palette; slots 1-3 also pass all-pairs) */
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
@@ -101,9 +44,67 @@
   --series-6: #0ca30c;
   --series-7: #9085e9;
   --series-8: #e66767;
+  /* Diverging poles for "what matters most" (better / worse than the baseline) */
   --better: #3987e5;
   --worse: #e66767;
-  --grid: #26262d;
+  --grid: #16302b;
+  /* Brand gradient: fills (buttons, logo, meters) and text (one headline phrase). */
+  --grad-1: #0bcf77;
+  --grad-2: #69d619;
+  --grad-text-1: #1bd987;
+  --grad-text-2: #8fe23f;
+  /* Decoration: hero glows, background grid, elevation */
+  --glow-1: #0bcf77;
+  --glow-2: #69d619;
+  --glow-3: #0e9fae;
+  --glow-strength: 30%;
+  --grid-line: rgb(255 255 255 / 0.04);
+  --outline-text: rgb(236 246 241 / 0.2);
+  --elevation-1: 0 1px 0 rgb(255 255 255 / 0.035) inset, 0 8px 24px -12px rgb(0 0 0 / 0.7);
+  --elevation-2: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 30px 70px -24px rgb(0 0 0 / 0.85);
+  --elevation-glow: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 10px 30px -10px rgb(11 207 119 / 0.6);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --background: #f3f8f5;
+  --surface: #ffffff;
+  --surface-muted: #e9f2ed;
+  --foreground: #06201a;
+  --muted: #4b625b;
+  --border: #d9e6df;
+  --border-strong: #bfd4ca;
+  --accent: #037a47;
+  --accent-foreground: #ffffff;
+  --accent-soft: #ddf5e8;
+  --ring: #0aa862;
+  --estimate: #92400e;
+  --estimate-surface: #fef3c7;
+  --estimate-border: #f59e0b;
+  --danger: #b91c1c;
+  --danger-surface: #fee2e2;
+  --success: #047857;
+  --success-surface: #d1fae5;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+  --better: #2a78d6;
+  --worse: #e34948;
+  --grid: #e3ece7;
+  --grad-text-1: #03985a;
+  --grad-text-2: #4b950b;
+  --glow-strength: 18%;
+  --grid-line: rgb(6 32 26 / 0.05);
+  --outline-text: rgb(6 32 26 / 0.18);
+  --elevation-1: 0 1px 2px rgb(6 32 26 / 0.05), 0 6px 18px -8px rgb(6 32 26 / 0.1);
+  --elevation-2: 0 1px 2px rgb(6 32 26 / 0.06), 0 24px 56px -20px rgb(6 32 26 / 0.22);
+  --elevation-glow: 0 1px 0 rgb(255 255 255 / 0.4) inset, 0 10px 26px -10px rgb(8 160 92 / 0.55);
 }
 
 @theme inline {
@@ -113,9 +114,12 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
   --color-ring: var(--ring);
+  --color-on-brand: var(--on-brand);
   --color-estimate: var(--estimate);
   --color-estimate-surface: var(--estimate-surface);
   --color-estimate-border: var(--estimate-border);
@@ -126,11 +130,255 @@
   --color-grid: var(--grid);
   --color-better: var(--better);
   --color-worse: var(--worse);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --shadow-card: var(--elevation-1);
+  --shadow-pop: var(--elevation-2);
+  --shadow-glow: var(--elevation-glow);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-feature-settings: 'ss01';
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--grad-1) 35%, transparent);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+/* Headings: bold and tight, like the reference's display type. */
+@utility font-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+/* The brand gradient on one headline phrase. */
+@utility text-gradient {
+  background-image: linear-gradient(90deg, var(--grad-text-1), var(--grad-text-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/*
+ * The brand gradient as a fill. It is three times as wide as the element, so moving the
+ * background position (on hover) slides the colours across: the reference's button effect.
+ */
+@utility bg-brand {
+  background-image: linear-gradient(
+    90deg,
+    var(--grad-1),
+    var(--grad-2) 50%,
+    var(--grad-2) 60%,
+    var(--grad-1)
+  );
+  background-size: 300% 100%;
+  background-position: 0% 50%;
+}
+
+/* The green glow behind the top of the page. */
+@utility bg-glow {
+  background:
+    radial-gradient(
+      48rem 26rem at 50% -8%,
+      color-mix(in oklab, var(--glow-1) var(--glow-strength), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      30rem 18rem at 12% 8%,
+      color-mix(in oklab, var(--glow-3) calc(var(--glow-strength) * 0.6), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      30rem 18rem at 88% 4%,
+      color-mix(in oklab, var(--glow-2) calc(var(--glow-strength) * 0.55), transparent),
+      transparent 70%
+    );
+}
+
+/* A faint grid that fades out from the top centre (hero). */
+@utility bg-grid {
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 100%);
+}
+
+/* A 1px gradient border on a rounded element with a surface fill (highlighted panels). */
+@utility border-gradient {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(
+        135deg,
+        color-mix(in oklab, var(--grad-1) 70%, transparent),
+        color-mix(in oklab, var(--border-strong) 80%, transparent) 40%,
+        color-mix(in oklab, var(--border-strong) 80%, transparent) 60%,
+        color-mix(in oklab, var(--grad-2) 70%, transparent)
+      )
+      border-box;
+}
+
+/* Outlined display text (the decisions marquee). */
+@utility text-outline {
+  color: transparent;
+  -webkit-text-stroke: 1px var(--outline-text);
+}
+
+/* The hero's load sequence: each part rises in after the one before (set --rise-delay). */
+@utility rise {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise 1s var(--ease-out) both;
+    animation-delay: var(--rise-delay, 0ms);
+  }
+}
+
+/*
+ * Scroll reveals (components/motion/reveal.tsx): hidden only once the inline script has marked
+ * the page as scripted, so content never stays invisible without JavaScript.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-js] [data-reveal] {
+    transition:
+      opacity 0.9s var(--ease-out),
+      transform 0.9s var(--ease-out);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+
+  [data-js] [data-reveal]:not([data-revealed]) {
+    opacity: 0;
+    transform: translateY(2.5rem);
+  }
+}
+
+/* Switching theme cross-fades colours for a moment (set by lib/theme.ts). */
+[data-theme-switching] *,
+[data-theme-switching] *::before,
+[data-theme-switching] *::after {
+  transition:
+    background-color 0.35s ease,
+    border-color 0.35s ease,
+    color 0.35s ease,
+    fill 0.35s ease,
+    stroke 0.35s ease !important;
+}
+
+/* FAQ answers open smoothly where the browser can animate to `auto`. */
+@supports (interpolate-size: allow-keywords) {
+  .faq {
+    interpolate-size: allow-keywords;
+  }
+
+  .faq details::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height 0.35s var(--ease-out),
+      content-visibility 0.35s allow-discrete;
+  }
+
+  .faq details[open]::details-content {
+    height: auto;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .faq details::details-content {
+      transition: none;
+    }
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.75rem);
+  }
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes glow-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, 1.5rem, 0) scale(1.06);
+  }
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The futures mark drawing itself (loaders). */
+@keyframes futures-draw {
+  0% {
+    stroke-dashoffset: 1;
+  }
+  55%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* The landing hero: simulated futures unfold from today to the horizon, once. */
+@keyframes futures-unfold {
+  /* Negative insets leave room for stroke caps at the edges once fully drawn. */
+  from {
+    clip-path: inset(-1rem 100% -1rem -1rem);
+  }
+  to {
+    clip-path: inset(-1rem -1rem -1rem -1rem);
+  }
+}
+
+@keyframes futures-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes futures-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

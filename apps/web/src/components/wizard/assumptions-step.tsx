@@ -219,8 +219,10 @@ export function AssumptionsStep({
         ) : null}
       </div>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Here&apos;s what we assumed</h1>
-        <p className="mt-1 max-w-2xl text-muted">
+        <h1 className="font-display text-3xl leading-[1.1] sm:text-4xl">
+          Here&apos;s what we assumed
+        </h1>
+        <p className="mt-2 max-w-2xl text-muted">
           The simulation uses these numbers. Ranges mean we&apos;re unsure: each simulated future
           picks a value inside the range.{' '}
           {estimates > 0 ? (

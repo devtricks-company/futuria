@@ -1,16 +1,18 @@
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
-import { LayoutGrid, Plus, UserRound } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { Logo } from '@/components/brand';
+import {
+  HeaderMobileMenu,
+  HeaderNav,
+  HeaderShell,
+  MobileMenu,
+  NavLinks,
+} from '@/components/header-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { clerkEnabled } from '@/lib/clerk';
-
-const NAV = [
-  { href: '/new', label: 'New simulation', icon: Plus },
-  { href: '/dashboard', label: 'My simulations', icon: LayoutGrid },
-  { href: '/settings/profile', label: 'Profile', icon: UserRound },
-] as const;
 
 /** Clerk's controls read the request, so they sit inside Suspense. */
 function AuthControls() {
@@ -23,7 +25,7 @@ function AuthControls() {
           </Button>
         </SignInButton>
         <SignUpButton>
-          <Button size="sm" className="hidden sm:inline-flex">
+          <Button size="sm" variant="secondary" className="hidden sm:inline-flex">
             Sign up
           </Button>
         </SignUpButton>
@@ -35,33 +37,38 @@ function AuthControls() {
   );
 }
 
-/** Top bar on every page. */
+/** Top bar on every page: brand, named destinations, one persistent call to action. */
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
+    <HeaderShell>
       <nav
         aria-label="Main"
-        className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 px-4 sm:px-6"
+        className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-2 px-4 sm:h-18 sm:px-6"
       >
         <Link
           href="/"
-          className="font-mono text-xs font-semibold tracking-widest uppercase hover:text-accent"
+          aria-label="Futuria home"
+          className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Futuria
+          <Logo />
         </Link>
+        <Suspense fallback={<NavLinks pathname={null} />}>
+          <HeaderNav />
+        </Suspense>
         <div className="flex items-center gap-1">
-          {NAV.map(({ href, label, icon: Icon }) => (
-            <Button key={href} asChild variant="ghost" size="sm" className="px-2.5 sm:px-3">
-              <Link href={href} aria-label={label} title={label}>
-                <Icon />
-                <span className="hidden md:inline">{label}</span>
-              </Link>
-            </Button>
-          ))}
-          <ThemeToggle />
+          <ThemeToggle className="hidden md:inline-flex" />
           {clerkEnabled ? <AuthControls /> : null}
+          <Button asChild size="sm" className="ml-1 px-3 sm:px-4">
+            <Link href="/new" aria-label="New simulation" title="New simulation">
+              <Plus />
+              <span className="hidden sm:inline">New simulation</span>
+            </Link>
+          </Button>
+          <Suspense fallback={<MobileMenu pathname={null} />}>
+            <HeaderMobileMenu />
+          </Suspense>
         </div>
       </nav>
-    </header>
+    </HeaderShell>
   );
 }

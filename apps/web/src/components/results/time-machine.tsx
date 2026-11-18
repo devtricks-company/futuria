@@ -14,7 +14,7 @@ function StoryList({ title, items }: { title: string; items: string[] }) {
   if (!items.length) return null;
   return (
     <div>
-      <p className="text-xs font-medium tracking-wide text-muted uppercase">{title}</p>
+      <p className="text-sm font-semibold text-muted">{title}</p>
       <ul className="mt-1 list-disc pl-5 text-sm">
         {items.map((item) => (
           <li key={item}>{item}</li>

@@ -8,7 +8,7 @@ import { formatValue } from '@/lib/format';
 import type { SliderDef, SliderGroup, TweakValues } from '@/lib/tweaks';
 import { cn } from '@/lib/utils';
 
-function SliderRow({
+export function SliderRow({
   idPrefix,
   slider,
   value,
@@ -30,7 +30,12 @@ function SliderRow({
         <label htmlFor={id} className="text-sm font-medium">
           {slider.label}
         </label>
-        <span className={cn('text-sm tabular-nums', changed ? 'font-semibold' : 'text-muted')}>
+        <span
+          className={cn(
+            'shrink-0 text-sm whitespace-nowrap tabular-nums',
+            changed ? 'font-semibold' : 'text-muted',
+          )}
+        >
           {fmt(value)}
         </span>
       </div>
@@ -97,7 +102,7 @@ export function TweakPanel({
       </p>
       {groups.map((group) => (
         <section key={group.pathId ?? 'baseline'} className="flex flex-col gap-4">
-          <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted uppercase">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-muted">
             {group.pathId ? <PathSwatch index={colorIndex[group.pathId] ?? 0} /> : null}
             {group.title}
           </h3>
