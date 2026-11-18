@@ -4,13 +4,14 @@ _Explore the Future Before You Live It._
 
 ## Progress
 
-| Phase                | Status                                                                                                    |
-| -------------------- | --------------------------------------------------------------------------------------------------------- |
-| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                    |
-| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms        |
-| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)   |
-| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open |
-| 4–11                 | Not started                                                                                               |
+| Phase                | Status                                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                     |
+| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms         |
+| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)    |
+| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open  |
+| 4. Web app MVP       | 🟡 Built (2026-11-17): Playwright journey green on desktop + mobile (fixture). Manual real-Claude run open |
+| 5–11                 | Not started                                                                                                |
 
 **Phase 2 notes (deviations from the plan below):**
 
@@ -43,6 +44,29 @@ _Explore the Future Before You Live It._
 - **Status machine:** runs go `queued → simulating → narrating → ready`; `POST /run` now answers 202. A story refresh (`POST /renarrate`) goes `queued → narrating → ready`. Out-of-scope and crisis intakes stay `draft`, with `intake.routing` recorded.
 - **Partial stories:** if Claude refuses one path's story, the run still finishes with the engine results and an `error` note. Retryable failures use the Inngest retries, then mark the run `failed`.
 - **Not gated yet:** "story refresh" is a Pro feature in `plans.ts`, but `/renarrate` isn't plan-gated until Phase 5 (`PlanGuard`).
+
+**Phase 4 status and notes (2026-11-17):**
+
+- **Built:**
+  - landing page (hero input that works without JavaScript, examples, how it works, pricing from `PLANS`)
+  - the `/new` → `/new/[id]` wizard: decision, questions, paths, assumptions review with AI estimates in amber and every value editable
+  - `/s/[id]`: progress screen, Compare (path cards and the fan chart), the scenario switch, the Tweak panel, What matters most (tornado), Time Machine and Action plan
+  - `/dashboard` and `/settings/profile`
+  - dark mode with a toggle, phone layouts, disclaimers
+- **Verified:**
+  - `pnpm check` (web unit tests included)
+  - Playwright (`pnpm --filter @futuria/web test:e2e`): Sara's journey, profile pre-fill, out-of-scope and crisis routing, each on desktop and a Pixel 7 viewport, against the built API in fixture mode
+  - a screenshot pass in light and dark
+- **Open for ✅:** a manual run with real Claude on a phone and a desktop (your part; about $0.40 per run, plus about $0.25 per "Update the story").
+- **Deviations from the plan above:**
+  - **API access goes through a same-origin proxy** (`app/api/backend/[...path]`, endpoint allowlist). The browser never holds the API URL or a token. It adds the Clerk token, or the dev identity in `AUTH_MODE=dev`.
+  - **"Update the story" runs the simulation again** (`PATCH /model` with the tweaks, then `POST /run`) instead of calling `/renarrate`, which reuses the stored numbers and would describe the old future. The cost is the same as a story refresh.
+  - **Sliders recompute in a Web Worker** with the stored seed: `simulate` while dragging, the full `analyze` 300 ms after release. With no tweaks the stored analysis is shown. During a re-run the page keeps this device's computation of the new model on screen (same seed, so the same numbers).
+  - **Profile:** `GET/PUT /me/profile` (new) stores the baseline. It pre-fills intake questions through their `informs` field, on the client. Nothing new is sent to Claude, so no prompt change was needed.
+  - **Out-of-scope intakes** show a "not yet" screen with no new waitlist store: the intake (with `routing`) is already saved as demand data.
+  - **Clerk is optional in the web app.** Without a publishable key it runs without sign-in (CI, e2e), which keeps Phase 5's signup gate separate.
+  - **Shared code:** `FIELD_META` (units and bounds) is now shared by the API clamps and the web inputs. `milestoneMonths` moved to `@futuria/shared`.
+- **Found while testing:** Clerk's `router.refresh()` when its script loads can swallow a pending `router.push`, which could leave the wizard spinning after a fast step. Navigations after mutations go through `useNavigate()` (`lib/navigation.ts`), which falls back to a full page load if the page didn't change.
 
 ## Context
 
@@ -206,6 +230,7 @@ Settings: 3 retries, concurrency of 2 per user, global throttle. Inngest is moun
 **Cost:**
 
 - Budget assumption: roughly $0.30–0.70 per full simulation on `claude-opus-5-5` at medium effort.
+  - Measured on 2026-11-18 with the 30-persona eval: $0.37 at medium. An `xhigh` trial cost $0.78 and doubled the wait with no quality gain, so we stay on medium.
 - **We measure the real figure in Phase 3** from the logged usage.
 - Slider tweaks are free.
 - If margins are tight, the levers are lower narrative effort, caching, or a cheaper model for the narrative. That choice is yours after we measure.

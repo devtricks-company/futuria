@@ -128,3 +128,14 @@ export interface FullAnalysis {
   result: SimulationResult;
   byPath: Record<string, PathAnalysis>;
 }
+
+/**
+ * Time Machine months: 1/3/6/9/12, then wider steps for longer horizons, always ending at the
+ * horizon. The narrative writes one milestone per month here; the UI shows engine numbers beside
+ * each one.
+ */
+export function milestoneMonths(horizon: number): number[] {
+  const months = [1, 3, 6, 9, 12, 18, 24, 36, 48, 60, 90, 120].filter((m) => m <= horizon);
+  if (!months.includes(horizon)) months.push(horizon);
+  return months;
+}

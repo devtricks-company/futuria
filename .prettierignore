@@ -6,3 +6,5 @@ coverage
 next-env.d.ts
 # Recorded Claude outputs (written by fixtures:record)
 apps/api/fixtures
+# Vendored third-party Claude Code skills (kept byte-identical to upstream)
+.claude/skills

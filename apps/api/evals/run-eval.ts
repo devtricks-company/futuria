@@ -48,6 +48,16 @@ const HORIZON = 12;
 const GUARANTEE =
   /\b(guarantee[ds]?(?!\s+(?:minimum|pay|hours|income|base|salary|rate|retainer)s?\b)|certainly will|definitely will|will definitely|will certainly|risk[- ]free|100% (?:safe|sure|certain)|can(?:'|no)t fail|no risk)\b/i;
 
+/**
+ * Telling the person to ask about a guarantee ("Ask whether there is a draw, base or guarantee")
+ * names a deal term to check, not a promise. Only the asked-about mention is removed, up to the
+ * first "guarantee", so a promise later in the same text is still caught.
+ */
+const ASKED_ABOUT_GUARANTEE =
+  /\b(?:ask|check|find out|confirm|negotiate)\b[^.!?;]*?\bguarantee[ds]?\b/gi;
+
+const promisesOutcome = (text: string) => GUARANTEE.test(text.replace(ASKED_ABOUT_GUARANTEE, ''));
+
 interface CheckResult {
   name: string;
   hard: boolean;
@@ -218,7 +228,7 @@ async function evaluate(ai: AiProvider, persona: Persona): Promise<PersonaResult
         true,
         ungrounded.length ? `${ungrounded.join(', ')} in: ${[...new Set(where)].join(' | ')}` : '',
       );
-      const promises = narrativeTexts(narrative).filter((t) => GUARANTEE.test(t));
+      const promises = narrativeTexts(narrative).filter(promisesOutcome);
       check(`${path.id}: no guarantee language`, promises.length === 0, true, promises[0]);
       const ids = new Set(facts.interventions.map((i) => i.id));
       check(

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { type Profile, profileSchema } from '@futuria/shared';
 import { User, type UserDocument } from './user.schema.js';
 
 const DUPLICATE_KEY = 11000;
@@ -22,6 +23,22 @@ export class UsersService {
 
   findById(id: string): Promise<UserDocument | null> {
     return this.users.findById(id).exec();
+  }
+
+  /** The saved baseline, or null if the user hasn't saved one (or it no longer validates). */
+  async getProfile(id: string): Promise<Profile | null> {
+    const user = await this.users.findById(id, { baseline: 1 }).lean().exec();
+    if (!user?.baseline) return null;
+    const parsed = profileSchema.safeParse(user.baseline);
+    return parsed.success ? parsed.data : null;
+  }
+
+  async saveProfile(id: string, profile: Profile): Promise<Profile> {
+    await this.users
+      .updateOne({ _id: id }, { $set: { baseline: profile } })
+      .orFail()
+      .exec();
+    return profile;
   }
 
   private upsert(externalId: string): Promise<UserDocument> {

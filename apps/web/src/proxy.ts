@@ -1,8 +1,10 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import { clerkEnabled } from '@/lib/clerk';
 
 // Routes are public by default. Protect pages, Route Handlers and Server Actions individually
-// with `await auth.protect()`.
-export default clerkMiddleware();
+// with `await auth.protect()`. Without Clerk keys (CI, e2e tests) the proxy is a pass-through.
+export default clerkEnabled ? clerkMiddleware() : () => NextResponse.next();
 
 export const config = {
   matcher: [
