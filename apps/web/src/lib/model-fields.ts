@@ -152,6 +152,36 @@ export function setFieldValue(
   return next;
 }
 
+/** Keys of the fields whose value is an AI estimate: the review's checklist. */
+export function estimateKeys(groups: FieldGroup[]): Set<string> {
+  return new Set(
+    groups.flatMap((g) =>
+      g.fields.filter((f) => f.assumption?.source === 'ai_estimate').map((f) => f.key),
+    ),
+  );
+}
+
+/**
+ * Put one field back the way it was in `original` (value and assumption source): "Undo" after
+ * confirming or editing an estimate. Returns a new model.
+ */
+export function restoreField(
+  model: DecisionModel,
+  original: DecisionModel,
+  key: string,
+): DecisionModel {
+  const before = groupFields(original)
+    .flatMap((g) => g.fields)
+    .find((f) => f.key === key);
+  if (!before) return model;
+  const next = withField(model, before.pathId ?? '', before.field, before.value);
+  if (before.assumption) {
+    const { id, source } = before.assumption;
+    next.assumptions = next.assumptions.map((a) => (a.id === id ? { ...a, source } : a));
+  }
+  return next;
+}
+
 /** A problem with a value, or null if it is usable. */
 export function validateValue(value: FieldValue, meta: FieldMeta | undefined): string | null {
   if (typeof value === 'boolean') return null;

@@ -28,7 +28,7 @@ export function RadioCard({
       <span className="flex size-4 shrink-0 items-center justify-center rounded-full border border-muted">
         <RadioGroupPrimitive.Indicator className="size-2 rounded-full bg-accent" />
       </span>
-      <span>{children}</span>
+      <span className="flex min-w-0 flex-1 items-center justify-between gap-2">{children}</span>
     </RadioGroupPrimitive.Item>
   );
 }

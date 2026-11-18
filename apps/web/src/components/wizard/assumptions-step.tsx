@@ -1,29 +1,34 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Pencil, Play, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ArrowLeft, Check, ChevronDown, Pencil, Play, Sparkles, Undo2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Assumption, DecisionModel, SimulationDto } from '@futuria/shared';
 import { Notice } from '@/components/notice';
+import { PathSwatch } from '@/components/results/path-color';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardDescription, CardTitle } from '@/components/ui/card';
-import { Label, NativeSelect } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { Segmented, SegmentedItem } from '@/components/ui/toggle-group';
 import { Stepper } from '@/components/wizard/stepper';
-import { ValueEditor, describeValue } from '@/components/wizard/value-editor';
+import { ValueEditor, valueParts } from '@/components/wizard/value-editor';
 import { api, errorMessage, queryKeys } from '@/lib/api';
 import { useNavigate } from '@/lib/navigation';
 import {
   type FieldGroup,
   type ModelField,
-  countEstimates,
+  estimateKeys,
   groupFields,
+  restoreField,
   setFieldValue,
 } from '@/lib/model-fields';
 import { PATH_TYPE_HINTS } from '@/lib/paths';
 import { cn } from '@/lib/utils';
 
 const HORIZONS = [12, 24, 36, 60] as const;
+
+/** DOM ids from field keys like "freelance:freelance.hourlyRate". */
+const domId = (key: string) => key.replace(/[^a-zA-Z0-9-]/g, '-');
 
 export function SourceBadge({ assumption }: { assumption: Assumption | undefined }) {
   if (!assumption) return null;
@@ -33,7 +38,7 @@ export function SourceBadge({ assumption }: { assumption: Assumption | undefined
         <Badge variant="estimate" title={`AI estimate, ${assumption.confidence} confidence`}>
           <Sparkles aria-hidden />
           AI estimate
-          {assumption.confidence === 'low' ? ' · low confidence' : ''}
+          {assumption.confidence === 'low' ? ', low confidence' : ''}
         </Badge>
       );
     case 'user':
@@ -43,59 +48,193 @@ export function SourceBadge({ assumption }: { assumption: Assumption | undefined
   }
 }
 
-function FieldRow({
+/** The value, right-aligned on wider screens; a range shows its most likely point beneath. */
+function FieldValue({ field, currency }: { field: ModelField; currency: string }) {
+  const { main, likely } = valueParts(field.value, field.meta, currency);
+  return (
+    <span className="flex shrink-0 flex-col tabular-nums sm:items-end sm:text-right">
+      <span className="font-semibold">{main}</span>
+      {likely ? <span className="text-xs text-muted">most likely {likely}</span> : null}
+    </span>
+  );
+}
+
+interface RowActions {
+  editing: boolean;
+  onEdit: () => void;
+  onSave: (value: ModelField['value']) => void;
+  onCancel: () => void;
+}
+
+function Editor({
+  field,
+  onSave,
+  onCancel,
+}: { field: ModelField } & Pick<RowActions, 'onSave' | 'onCancel'>) {
+  return (
+    <ValueEditor
+      idPrefix={domId(field.key)}
+      value={field.value}
+      meta={field.meta}
+      onSave={onSave}
+      onCancel={onCancel}
+    />
+  );
+}
+
+function EditButton({ field, onEdit }: { field: ModelField; onEdit: () => void }) {
+  return (
+    <Button
+      id={`edit-${domId(field.key)}`}
+      variant="ghost"
+      size="sm"
+      onClick={onEdit}
+      aria-label={`Edit ${field.label}`}
+    >
+      <Pencil />
+      Edit
+    </Button>
+  );
+}
+
+/**
+ * An AI estimate on the checklist. Open, it shows Claude's reasoning with "Looks right" and
+ * "Edit"; once confirmed or changed it folds to one line with "Undo".
+ */
+function EstimateRow({
   field,
   currency,
   editing,
   onEdit,
   onSave,
   onCancel,
+  onConfirm,
+  onUndo,
 }: {
   field: ModelField;
   currency: string;
-  editing: boolean;
-  onEdit: () => void;
-  onSave: (value: ModelField['value']) => void;
-  onCancel: () => void;
-}) {
-  const estimate = field.assumption?.source === 'ai_estimate';
+  onConfirm: () => void;
+  onUndo: () => void;
+} & RowActions) {
+  const checked = field.assumption?.source !== 'ai_estimate';
+  const id = domId(field.key);
   return (
     <li
-      className={cn(
-        'flex flex-col gap-2 px-5 py-4 sm:px-6',
-        estimate && 'border-l-4 border-l-estimate-border bg-estimate-surface/40 pl-4 sm:pl-5',
-      )}
       data-testid="assumption"
       data-source={field.assumption?.source ?? 'none'}
+      className={cn(
+        'flex flex-col gap-3 px-5 py-4 transition-colors duration-300 sm:px-7',
+        !checked &&
+          'border-l-4 border-l-estimate-border bg-estimate-surface/35 pl-4 sm:pl-6 sm:py-5',
+      )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{field.label}</span>
-            <SourceBadge assumption={field.assumption} />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="flex min-w-0 items-start gap-3">
+          {checked ? (
+            <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-success-surface text-success motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300">
+              <Check className="size-3" strokeWidth={3} aria-hidden />
+            </span>
+          ) : null}
+          <div className="flex min-w-0 flex-col items-start gap-1.5">
+            <span data-testid="assumption-label" className="font-medium">
+              {field.label}
+            </span>
+            {checked ? (
+              <span className="text-xs text-success">Checked</span>
+            ) : (
+              <SourceBadge assumption={field.assumption} />
+            )}
           </div>
-          <span className="text-sm tabular-nums">
-            {describeValue(field.value, field.meta, currency)}
-          </span>
         </div>
-        {!editing ? (
-          <Button variant="ghost" size="sm" onClick={onEdit} aria-label={`Edit ${field.label}`}>
-            <Pencil />
-            Edit
-          </Button>
-        ) : null}
+        <div
+          className={cn(
+            'flex items-center justify-between gap-3 sm:justify-end',
+            checked && 'pl-8 sm:pl-0',
+          )}
+        >
+          <FieldValue field={field} currency={currency} />
+          {checked && !editing ? (
+            <div className="flex shrink-0">
+              <Button
+                id={`undo-${id}`}
+                variant="ghost"
+                size="sm"
+                onClick={onUndo}
+                aria-label={`Undo: ${field.label}`}
+              >
+                <Undo2 />
+                Undo
+              </Button>
+              <EditButton field={field} onEdit={onEdit} />
+            </div>
+          ) : null}
+        </div>
       </div>
-      {field.assumption?.rationale ? (
+
+      {!checked && field.assumption?.rationale ? (
         <p className="text-sm text-muted">{field.assumption.rationale}</p>
       ) : null}
+
       {editing ? (
-        <ValueEditor
-          idPrefix={field.key.replace(/[^a-zA-Z0-9-]/g, '-')}
-          value={field.value}
-          meta={field.meta}
-          onSave={onSave}
-          onCancel={onCancel}
-        />
+        <Editor field={field} onSave={onSave} onCancel={onCancel} />
+      ) : !checked ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            id={`confirm-${id}`}
+            variant="secondary"
+            size="sm"
+            onClick={onConfirm}
+            aria-label={`Looks right: ${field.label}`}
+          >
+            <Check />
+            Looks right
+          </Button>
+          <EditButton field={field} onEdit={onEdit} />
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+/** A value from the person's answers or a typical default: one line until edited. */
+function ValueRow({
+  field,
+  currency,
+  editing,
+  onEdit,
+  onSave,
+  onCancel,
+}: { field: ModelField; currency: string } & RowActions) {
+  const source = field.assumption?.source;
+  return (
+    <li
+      data-testid="assumption"
+      data-source={source ?? 'none'}
+      className="flex flex-col gap-3 px-5 py-3.5 sm:px-7"
+    >
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="flex min-w-0 flex-col">
+          <span data-testid="assumption-label" className="font-medium">
+            {field.label}
+          </span>
+          {source === 'user' || source === 'default' ? (
+            <span className="text-xs text-muted">
+              {source === 'user' ? 'From your answers' : 'Typical default'}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex items-center justify-between gap-3 sm:justify-end">
+          <FieldValue field={field} currency={currency} />
+          {!editing ? <EditButton field={field} onEdit={onEdit} /> : null}
+        </div>
+      </div>
+      {editing ? (
+        <>
+          {field.assumption?.rationale ? (
+            <p className="text-sm text-muted">{field.assumption.rationale}</p>
+          ) : null}
+          <Editor field={field} onSave={onSave} onCancel={onCancel} />
+        </>
       ) : null}
     </li>
   );
@@ -103,53 +242,109 @@ function FieldRow({
 
 function GroupCard({
   group,
+  pathIndex,
+  toCheck,
   currency,
   editingKey,
-  setEditingKey,
-  onChange,
+  onEdit,
+  onSave,
+  onCancel,
+  onConfirm,
+  onUndo,
 }: {
   group: FieldGroup;
+  /** Position among the paths (for the colour), or null for the starting point. */
+  pathIndex: number | null;
+  toCheck: ReadonlySet<string>;
   currency: string;
   editingKey: string | null;
-  setEditingKey: (key: string | null) => void;
-  onChange: (field: ModelField, value: ModelField['value']) => void;
+  onEdit: (field: ModelField) => void;
+  onSave: (field: ModelField, value: ModelField['value']) => void;
+  onCancel: (field: ModelField) => void;
+  onConfirm: (field: ModelField) => void;
+  onUndo: (field: ModelField) => void;
 }) {
-  // Values with an assumption come first; the rest are standard settings, folded away.
-  const main = group.fields.filter((f) => f.assumption);
-  const more = group.fields.filter((f) => !f.assumption);
-  const row = (field: ModelField) => (
-    <FieldRow
-      key={field.key}
-      field={field}
-      currency={currency}
-      editing={editingKey === field.key}
-      onEdit={() => setEditingKey(field.key)}
-      onCancel={() => setEditingKey(null)}
-      onSave={(value) => {
-        onChange(field, value);
-        setEditingKey(null);
-      }}
-    />
-  );
+  // The checklist was fixed when the step opened, so confirmed rows stay where they are.
+  const estimates = group.fields.filter((f) => toCheck.has(f.key));
+  const rest = group.fields.filter((f) => !toCheck.has(f.key));
+  const open = estimates.filter((f) => f.assumption?.source === 'ai_estimate').length;
+  const fromYou = rest.filter((f) => f.assumption?.source === 'user').length;
+  const actions = (field: ModelField): RowActions => ({
+    editing: editingKey === field.key,
+    onEdit: () => onEdit(field),
+    onSave: (value) => onSave(field, value),
+    onCancel: () => onCancel(field),
+  });
+
   return (
-    <Card className="p-0 sm:p-0">
-      <div className="border-b border-border px-5 py-4 sm:px-6">
-        <CardTitle>{group.title}</CardTitle>
-        <CardDescription>
-          {group.type ? PATH_TYPE_HINTS[group.type] : 'Shared by every path.'}
-        </CardDescription>
+    <Card className="overflow-hidden p-0 sm:p-0">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4 sm:px-7 sm:py-5">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+            {pathIndex !== null ? <PathSwatch index={pathIndex} /> : null}
+            {group.title}
+          </h2>
+          <p className="text-sm text-muted">
+            {group.type ? PATH_TYPE_HINTS[group.type] : 'Shared by every path.'}
+          </p>
+        </div>
+        {estimates.length ? (
+          open ? (
+            <Badge variant="estimate">{open} to check</Badge>
+          ) : (
+            <Badge variant="success">
+              <Check aria-hidden />
+              All checked
+            </Badge>
+          )
+        ) : null}
       </div>
-      <ul className="divide-y divide-border">{main.map(row)}</ul>
-      {more.length ? (
-        <details className="group border-t border-border">
-          <summary className="cursor-pointer px-5 py-3 text-sm text-muted select-none hover:text-foreground sm:px-6">
-            {more.length} more {more.length === 1 ? 'setting' : 'settings'}
+
+      {estimates.length ? (
+        <ul className="divide-y divide-border">
+          {estimates.map((field) => (
+            <EstimateRow
+              key={field.key}
+              field={field}
+              currency={currency}
+              {...actions(field)}
+              onConfirm={() => onConfirm(field)}
+              onUndo={() => onUndo(field)}
+            />
+          ))}
+        </ul>
+      ) : null}
+
+      {rest.length ? (
+        <details className={cn('group/more', estimates.length && 'border-t border-border')}>
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 text-sm select-none hover:bg-surface-muted/50 sm:px-7 [&::-webkit-details-marker]:hidden">
+            <span className="flex flex-col">
+              <span className="font-medium">
+                {estimates.length ? `${rest.length} more values` : `${rest.length} values`}
+              </span>
+              <span className="text-muted">
+                {fromYou && rest.length - fromYou
+                  ? `${fromYou} from your answers and ${rest.length - fromYou} typical ${rest.length - fromYou === 1 ? 'default' : 'defaults'}`
+                  : fromYou
+                    ? 'From your answers'
+                    : 'Typical defaults'}
+              </span>
+            </span>
+            <ChevronDown
+              className="size-4 shrink-0 text-muted transition-transform duration-300 group-open/more:rotate-180"
+              aria-hidden
+            />
           </summary>
-          <ul className="divide-y divide-border border-t border-border">{more.map(row)}</ul>
+          <ul className="divide-y divide-border border-t border-border">
+            {rest.map((field) => (
+              <ValueRow key={field.key} field={field} currency={currency} {...actions(field)} />
+            ))}
+          </ul>
         </details>
       ) : null}
+
       {group.notes.length ? (
-        <div className="border-t border-border px-5 py-4 text-sm sm:px-6">
+        <div className="border-t border-border px-5 py-4 text-sm sm:px-7">
           <p className="font-medium">Other notes</p>
           <ul className="mt-1 list-disc pl-5 text-muted">
             {group.notes.map((note) => (
@@ -164,7 +359,39 @@ function GroupCard({
   );
 }
 
-/** Wizard step 4: "Here's what we assumed". Every value is editable; AI estimates stand out. */
+/** The checklist's progress: how many of the AI estimates the person has looked at. */
+function EstimateProgress({ checked, total }: { checked: number; total: number }) {
+  const done = checked === total;
+  return (
+    <Card className="border-gradient flex flex-col gap-3 border-transparent">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="text-base font-semibold">
+          {done ? `All ${total} estimates checked` : 'Check our estimates'}
+        </h2>
+        <p className="text-sm font-semibold tabular-nums" aria-live="polite">
+          <span className={done ? 'text-success' : 'text-accent'}>{checked}</span>
+          <span className="text-muted"> of {total} checked</span>
+        </p>
+      </div>
+      <span aria-hidden className="h-1.5 overflow-hidden rounded-full bg-border">
+        <span
+          className="block h-full rounded-full bg-[linear-gradient(90deg,var(--grad-1),var(--grad-2))] transition-[width] duration-500 ease-[var(--ease-out)]"
+          style={{ width: `${(checked / total) * 100}%` }}
+        />
+      </span>
+      <p className="text-sm text-muted">
+        {done
+          ? 'Run the simulation when you’re ready. You can still change any value below.'
+          : `You didn’t give us ${total === 1 ? 'this value' : 'these values'}, so we estimated ${total === 1 ? 'it' : 'them'}. Confirm each with “Looks right”, or change it: you know your situation better.`}
+      </p>
+    </Card>
+  );
+}
+
+/**
+ * Wizard step 4: "Here's what we assumed". The AI estimates form a checklist (confirm or edit
+ * each one); the person's own answers and typical defaults fold away. Every value is editable.
+ */
 export function AssumptionsStep({
   simulation,
   maxHorizonMonths,
@@ -176,12 +403,33 @@ export function AssumptionsStep({
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [model, setModel] = useState<DecisionModel>(simulation.model!);
+  const original = simulation.model!;
+  const [model, setModel] = useState<DecisionModel>(original);
   const [dirty, setDirty] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const groups = useMemo(() => groupFields(model), [model]);
-  const estimates = countEstimates(groups);
+  const [toCheck] = useState(() => estimateKeys(groupFields(original)));
+  const checked = groups
+    .flatMap((g) => g.fields)
+    .filter((f) => toCheck.has(f.key) && f.assumption?.source !== 'ai_estimate').length;
   const currency = model.baseline.currency;
+
+  // After a row changes shape, keep keyboard focus on the button that took the old one's place.
+  const focusNext = useRef<string | null>(null);
+  useEffect(() => {
+    const id = focusNext.current;
+    if (!id) return;
+    focusNext.current = null;
+    document.getElementById(id)?.focus();
+  });
+
+  const change = (next: DecisionModel) => {
+    setModel(next);
+    setDirty(true);
+  };
+  const afterRow = (field: ModelField, kind: 'confirm' | 'undo' | 'edit') => {
+    focusNext.current = `${kind}-${domId(field.key)}`;
+  };
 
   const save = useMutation({
     mutationFn: () => api.updateModel(simulation.id, model),
@@ -208,7 +456,8 @@ export function AssumptionsStep({
   const horizons = HORIZONS.filter((h) => h <= maxHorizonMonths);
 
   return (
-    <div className="flex flex-col gap-6 pb-24">
+    // Controls scroll (and focus) into view above the fixed action bar, never under it.
+    <div className="flex flex-col gap-6 pb-24 [&_:is(button,input,summary)]:scroll-mb-24">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Stepper current="Assumptions" />
         {onEditAnswers ? (
@@ -224,50 +473,57 @@ export function AssumptionsStep({
         </h1>
         <p className="mt-2 max-w-2xl text-muted">
           The simulation uses these numbers. Ranges mean we&apos;re unsure: each simulated future
-          picks a value inside the range.{' '}
-          {estimates > 0 ? (
-            <>
-              <strong className="font-medium text-estimate">
-                {estimates}{' '}
-                {estimates === 1 ? 'value is an AI estimate' : 'values are AI estimates'}
-              </strong>
-              : check them, you know your situation better.
-            </>
-          ) : null}
+          picks a value inside the range.
         </p>
       </div>
 
+      {toCheck.size ? <EstimateProgress checked={checked} total={toCheck.size} /> : null}
+
       {horizons.length > 1 ? (
-        <Card className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <Label htmlFor="horizon">How far ahead to simulate</Label>
-          <NativeSelect
-            id="horizon"
-            className="sm:w-48"
-            value={model.horizonMonths}
-            onChange={(e) => {
-              setModel({ ...model, horizonMonths: Number(e.target.value) });
-              setDirty(true);
-            }}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p id="horizon-label" className="text-sm font-medium">
+            How far ahead to simulate
+          </p>
+          <Segmented
+            aria-labelledby="horizon-label"
+            value={String(model.horizonMonths)}
+            onValueChange={(value) => change({ ...model, horizonMonths: Number(value) })}
           >
             {horizons.map((h) => (
-              <option key={h} value={h}>
+              <SegmentedItem key={h} value={String(h)}>
                 {h} months
-              </option>
+              </SegmentedItem>
             ))}
-          </NativeSelect>
-        </Card>
+          </Segmented>
+        </div>
       ) : null}
 
-      {groups.map((group) => (
+      {groups.map((group, index) => (
         <GroupCard
           key={group.pathId ?? 'baseline'}
           group={group}
+          // Groups are the starting point, then each path in model order.
+          pathIndex={group.pathId === null ? null : index - 1}
+          toCheck={toCheck}
           currency={currency}
           editingKey={editingKey}
-          setEditingKey={setEditingKey}
-          onChange={(field, value) => {
-            setModel((m) => setFieldValue(m, field, value));
-            setDirty(true);
+          onEdit={(field) => setEditingKey(field.key)}
+          onCancel={(field) => {
+            afterRow(field, 'edit');
+            setEditingKey(null);
+          }}
+          onSave={(field, value) => {
+            afterRow(field, toCheck.has(field.key) ? 'undo' : 'edit');
+            change(setFieldValue(model, field, value));
+            setEditingKey(null);
+          }}
+          onConfirm={(field) => {
+            afterRow(field, 'undo');
+            change(setFieldValue(model, field, field.value));
+          }}
+          onUndo={(field) => {
+            afterRow(field, 'confirm');
+            change(restoreField(model, original, field.key));
           }}
         />
       ))}

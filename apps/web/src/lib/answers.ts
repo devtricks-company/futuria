@@ -103,6 +103,40 @@ export function profileFilled(
   return ids;
 }
 
+/** A draft as shown back to the person: "4,000", "25%", "22 hours", "Yes". */
+export function describeDraft(question: IntakeQuestion, draft: AnswerDraft): string {
+  if (question.kind === 'boolean') return draft === true ? 'Yes' : 'No';
+  const text = typeof draft === 'string' ? draft.trim() : '';
+  if (text === '' || !isNumericKind(question.kind)) return text;
+  const n = Number(text.replace(/[,\s]/g, ''));
+  if (!Number.isFinite(n)) return text;
+  const shown = n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  switch (question.kind) {
+    case 'percent':
+      return `${shown}%`;
+    case 'hours':
+      return `${shown} ${n === 1 ? 'hour' : 'hours'}`;
+    case 'months':
+      return `${shown} ${n === 1 ? 'month' : 'months'}`;
+    default:
+      return shown;
+  }
+}
+
+/** Whether a draft differs from where it started (ignoring surrounding spaces). */
+export function draftChanged(draft: AnswerDraft, initial: AnswerDraft): boolean {
+  if (typeof draft === 'boolean' || typeof initial === 'boolean') return draft !== initial;
+  return draft.trim() !== initial.trim();
+}
+
+/** The first question (by position) that has an error, or -1. */
+export function firstErrorIndex(
+  questions: IntakeQuestion[],
+  errors: Record<string, string>,
+): number {
+  return questions.findIndex((q) => q.id in errors);
+}
+
 export function collectAnswers(
   questions: IntakeQuestion[],
   drafts: Record<string, AnswerDraft>,

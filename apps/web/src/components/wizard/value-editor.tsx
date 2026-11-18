@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type Distribution, type FieldMeta, isDistribution, isFractionUnit } from '@futuria/shared';
 import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { Segmented, SegmentedItem } from '@/components/ui/toggle-group';
 import { formatValue } from '@/lib/format';
 import { type FieldValue, validateValue } from '@/lib/model-fields';
 
@@ -16,6 +17,19 @@ export function describeValue(value: FieldValue, meta: FieldMeta | undefined, cu
   if (typeof value === 'number') return fmt(value);
   if (value.kind === 'fixed') return fmt(value.value);
   return `${fmt(value.low)} – ${fmt(value.high)} (most likely ${fmt(value.likely)})`;
+}
+
+/** A value split for display: the range (or single value), and the most likely point apart. */
+export function valueParts(
+  value: FieldValue,
+  meta: FieldMeta | undefined,
+  currency: string,
+): { main: string; likely: string | null } {
+  if (isDistribution(value) && value.kind === 'range') {
+    const fmt = (n: number) => formatValue(n, meta?.unit, currency);
+    return { main: `${fmt(value.low)} – ${fmt(value.high)}`, likely: fmt(value.likely) };
+  }
+  return { main: describeValue(value, meta, currency), likely: null };
 }
 
 type Points = { low: string; likely: string; high: string };
@@ -62,6 +76,13 @@ export function ValueEditor({
   const [code, setCode] = useState(typeof value === 'string' ? value : '');
   const [error, setError] = useState<string | null>(null);
 
+  // Opening the editor puts the cursor in its first field (or on its first control).
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = root.current;
+    (el?.querySelector<HTMLElement>('input') ?? el?.querySelector<HTMLElement>('button'))?.focus();
+  }, []);
+
   const parse = (text: string) => Number(text.replace(/[,\s]/g, '')) / scale;
 
   function build(): FieldValue {
@@ -102,7 +123,8 @@ export function ValueEditor({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl border border-border bg-surface-muted/60 p-3"
+      ref={root}
+      className="flex flex-col gap-3 rounded-xl border border-border bg-surface-muted/60 p-3 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-1 motion-safe:duration-300 sm:p-4"
       onKeyDown={(event) => {
         if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
           event.preventDefault();
@@ -132,10 +154,22 @@ export function ValueEditor({
       ) : (
         <>
           {dist ? (
-            <label className="flex items-center gap-3 text-sm">
-              <Switch checked={isRange} onCheckedChange={setIsRange} />
-              {isRange ? 'Uncertain: a range' : 'Known: a single value'}
-            </label>
+            <div className="flex flex-col gap-1.5">
+              <Segmented
+                aria-label="A range or one value"
+                value={isRange ? 'range' : 'fixed'}
+                onValueChange={(next) => setIsRange(next === 'range')}
+                className="sm:self-start"
+              >
+                <SegmentedItem value="range">A range</SegmentedItem>
+                <SegmentedItem value="fixed">One value</SegmentedItem>
+              </Segmented>
+              <p className="text-xs text-muted">
+                {isRange
+                  ? 'Unsure: each simulated future picks a value inside the range.'
+                  : 'Known: every simulated future uses this value.'}
+              </p>
+            </div>
           ) : null}
           <div className="flex flex-col gap-2 sm:flex-row">
             {isRange ? (

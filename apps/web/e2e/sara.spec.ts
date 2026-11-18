@@ -30,28 +30,60 @@ test('Sara simulates quitting to freelance, end to end', async ({ page, isMobile
   await expect(decision).toHaveValue(SARA);
   await page.getByRole('button', { name: 'Continue' }).click();
 
-  // 3. Questions with smart defaults (Claude's recorded intake).
+  // 3. Questions, one at a time, with smart defaults (Claude's recorded intake).
   await expect(page.getByRole('heading', { name: 'A few questions' })).toBeVisible();
   await expect(page).toHaveURL(/\/new\/[a-f0-9]{24}$/);
+  await expect(page.getByText('Question 1 of 7')).toBeVisible();
   await expect(page.getByLabel(/take-home pay/i)).toHaveValue('4000');
-  await page.getByRole('button', { name: 'Next: your paths' }).click();
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByLabel(/living expenses/i)).toHaveValue('2800');
+  await expect(page.getByLabel(/living expenses/i)).toBeFocused();
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByLabel(/take-home pay/i)).toHaveValue('4000');
+  // The rest keep their defaults (so the recorded model replays).
+  await page.getByRole('button', { name: 'Skip to your paths' }).click();
 
   // 4. Paths: three proposed futures.
   await expect(page.getByRole('heading', { name: 'The futures to compare' })).toBeVisible();
-  await expect(page.getByLabel('Name', { exact: true })).toHaveCount(3);
+  await expect(page.getByTestId('path-option')).toHaveCount(3);
+  // Each path opens into a small form and closes back to its summary.
+  await page
+    .getByTestId('path-option')
+    .first()
+    .getByRole('button', { name: /^Edit / })
+    .click();
+  await expect(page.getByLabel('Name', { exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByLabel('Name', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Build my simulation' }).click();
 
-  // 5. Assumptions review: AI estimates are flagged, everything is editable.
+  // 5. Assumptions review: the AI estimates are a checklist, everything is editable.
   await expect(page.getByRole('heading', { name: "Here's what we assumed" })).toBeVisible();
   const estimates = page.locator('[data-testid="assumption"][data-source="ai_estimate"]');
-  expect(await estimates.count()).toBeGreaterThan(5);
+  const total = await estimates.count();
+  expect(total).toBeGreaterThan(5);
   await expect(estimates.first().getByText('AI estimate')).toBeVisible();
+  await expect(page.getByText(`of ${total} checked`)).toBeVisible();
 
-  // Confirm one estimate by editing it: it becomes the person's own value.
-  const first = estimates.first();
-  const label = (await first.locator('span.font-medium').first().innerText()).trim();
-  await first.getByRole('button', { name: `Edit ${label}` }).click();
+  // "Looks right" confirms an estimate as it is; Undo puts it back.
+  const firstLabel = (await estimates.first().getByTestId('assumption-label').innerText()).trim();
+  await estimates
+    .first()
+    .getByRole('button', { name: `Looks right: ${firstLabel}` })
+    .click();
+  await expect(page.getByRole('button', { name: `Undo: ${firstLabel}` })).toBeFocused();
+  await expect(estimates).toHaveCount(total - 1);
+  await page.getByRole('button', { name: `Undo: ${firstLabel}` }).click();
+  await expect(estimates).toHaveCount(total);
+
+  // Editing an estimate also makes it the person's own value.
+  const label = (await estimates.first().getByTestId('assumption-label').innerText()).trim();
+  await estimates
+    .first()
+    .getByRole('button', { name: `Edit ${label}` })
+    .click();
   await page.getByRole('button', { name: 'Done' }).click();
+  await expect(estimates).toHaveCount(total - 1);
   await expect(page.getByText('You have unsaved changes')).toBeVisible();
 
   await page.getByRole('button', { name: 'Run simulation' }).click();
@@ -113,6 +145,12 @@ test('saved profile values pre-fill the questions', async ({ page }) => {
   await page.goto(`/new?q=${encodeURIComponent(SARA)}`);
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByRole('heading', { name: 'A few questions' })).toBeVisible();
+  // Jump straight to the savings question with its progress segment.
+  await page.getByRole('button', { name: 'Question 3', exact: true }).click();
   await expect(page.getByLabel(/savings could you draw on/i)).toHaveValue('22000');
   await expect(page.getByText('From your profile')).toBeVisible();
+  // A changed answer can go back to where it started.
+  await page.getByLabel(/savings could you draw on/i).fill('30000');
+  await page.getByRole('button', { name: 'Reset to 22,000' }).click();
+  await expect(page.getByLabel(/savings could you draw on/i)).toHaveValue('22000');
 });

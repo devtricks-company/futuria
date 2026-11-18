@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { type Assumption, SARA_MODEL, decisionModelSchema, range } from '@futuria/shared';
-import { countEstimates, groupFields, setFieldValue, validateValue } from './model-fields';
+import {
+  countEstimates,
+  estimateKeys,
+  groupFields,
+  restoreField,
+  setFieldValue,
+  validateValue,
+} from './model-fields';
 import { newPathId, pathsChanged } from './paths';
 
 const assumption = (overrides: Partial<Assumption>): Assumption => ({
@@ -73,6 +80,27 @@ describe('setFieldValue', () => {
       20000,
     );
     expect(next.baseline.startingCash).toBe(20000);
+  });
+});
+
+describe('estimate checklist', () => {
+  const rate = groupFields(model)
+    .find((g) => g.pathId === 'freelance')!
+    .fields.find((f) => f.field === 'hourlyRate')!;
+
+  it('lists the fields holding AI estimates', () => {
+    expect(estimateKeys(groupFields(model))).toEqual(
+      new Set(['freelance:hourlyRate', 'hybrid:freelance.hourlyRate']),
+    );
+  });
+
+  it('restores a confirmed or edited estimate', () => {
+    const edited = setFieldValue(model, rate, range(60, 75, 90));
+    const restored = restoreField(edited, model, rate.key);
+    const path = restored.paths.find((p) => p.id === 'freelance');
+    expect(path?.type === 'freelance' && path.hourlyRate).toEqual(rate.value);
+    expect(restored.assumptions.find((a) => a.id === 'rate')?.source).toBe('ai_estimate');
+    expect(restoreField(edited, model, 'nope')).toBe(edited);
   });
 });
 

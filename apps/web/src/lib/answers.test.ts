@@ -3,7 +3,10 @@ import { EMPTY_PROFILE, type IntakeQuestion } from '@futuria/shared';
 import {
   answerFromDraft,
   collectAnswers,
+  describeDraft,
+  draftChanged,
   draftFromValue,
+  firstErrorIndex,
   initialDrafts,
   profileFilled,
 } from './answers';
@@ -73,6 +76,24 @@ describe('intake answer drafts', () => {
 
   it('only accepts listed choices', () => {
     expect(answerFromDraft(leads, 'Maybe').error).toBe('Pick one of the options');
+  });
+
+  it('describes drafts the way the person reads them', () => {
+    expect(describeDraft(savings, '15000')).toBe('15,000');
+    expect(describeDraft(tax, '7')).toBe('7%');
+    expect(describeDraft(q({ kind: 'hours' }), '22')).toBe('22 hours');
+    expect(describeDraft(q({ kind: 'months' }), '1')).toBe('1 month');
+    expect(describeDraft(back, true)).toBe('Yes');
+    expect(describeDraft(savings, 'lots')).toBe('lots');
+    expect(describeDraft(leads, 'None')).toBe('None');
+  });
+
+  it('spots changed drafts and the first question with an error', () => {
+    expect(draftChanged(' 15000 ', '15000')).toBe(false);
+    expect(draftChanged('16000', '15000')).toBe(true);
+    expect(draftChanged(true, false)).toBe(true);
+    expect(firstErrorIndex([savings, tax, leads], { leads: 'x', tax: 'y' })).toBe(1);
+    expect(firstErrorIndex([savings], {})).toBe(-1);
   });
 
   it('pre-fills money questions from the profile, but saved answers win', () => {
