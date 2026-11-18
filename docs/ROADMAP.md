@@ -230,6 +230,7 @@ Settings: 3 retries, concurrency of 2 per user, global throttle. Inngest is moun
 **Cost:**
 
 - Budget assumption: roughly $0.30–0.70 per full simulation on `claude-opus-5-5` at medium effort.
+  - Measured on 2026-11-18 with the 30-persona eval: $0.37 at medium. An `xhigh` trial cost $0.78 and doubled the wait with no quality gain, so we stay on medium.
 - **We measure the real figure in Phase 3** from the logged usage.
 - Slider tweaks are free.
 - If margins are tight, the levers are lower narrative effort, caching, or a cheaper model for the narrative. That choice is yours after we measure.

@@ -38,8 +38,12 @@ export interface AnthropicProviderOptions {
   promptCache: boolean;
 }
 
-/** How hard Claude thinks per step. Opus 5.5 defaults to medium; we set it explicitly. */
-const EFFORT: Record<AiStep, 'low' | 'medium' | 'high'> = {
+/**
+ * How hard Claude thinks per step. Opus 5.5 defaults to medium; we set it explicitly. An xhigh
+ * trial (eval of 2026-11-18) cost about twice as much and took about twice as long with no
+ * quality gain, and needed max_tokens and the timeout raised (thinking counts against max_tokens).
+ */
+const EFFORT: Record<AiStep, NonNullable<Anthropic.Beta.BetaOutputConfig['effort']>> = {
   intake: 'medium',
   model: 'medium',
   narrative: 'medium',
