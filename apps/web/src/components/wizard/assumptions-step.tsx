@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Segmented, SegmentedItem } from '@/components/ui/toggle-group';
 import { Stepper } from '@/components/wizard/stepper';
-import { ValueEditor, valueParts } from '@/components/wizard/value-editor';
+import { ValueEditor } from '@/components/wizard/value-editor';
 import { api, errorMessage, queryKeys } from '@/lib/api';
 import { openGate } from '@/lib/gate-events';
 import { useNavigate } from '@/lib/navigation';
@@ -22,6 +22,7 @@ import {
   groupFields,
   restoreField,
   setFieldValue,
+  valueParts,
 } from '@/lib/model-fields';
 import { PATH_TYPE_HINTS } from '@/lib/paths';
 import { horizonUpgrade, isSignupRequired } from '@/lib/plan-gates';

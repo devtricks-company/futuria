@@ -2,7 +2,7 @@ import { Calculator, ChevronDown, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { PLANS, SARA_MODEL, SCENARIOS, decisionModelSchema, likelyValue } from '@futuria/shared';
-import { analyze, formatMoney } from '@futuria/engine';
+import { analyze, formatMoney, futuresChart } from '@futuria/engine';
 import { FeatureTiles, PrivacyNotes, rangeRows } from '@/components/landing/feature-tiles';
 import { FuturesChart } from '@/components/landing/futures-chart';
 import { LiveDemo } from '@/components/landing/live-demo';
@@ -14,7 +14,6 @@ import { DISCLAIMER } from '@/components/site-footer';
 import { Button } from '@/components/ui/button';
 import { DEMO_PATH_ID, DEMO_SEED } from '@/lib/demo';
 import { EXAMPLE_DECISIONS } from '@/lib/examples';
-import { futuresChart } from '@/lib/futures';
 import { cn } from '@/lib/utils';
 
 const STEPS = [
@@ -192,7 +191,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   },
   {
     q: 'What happens to what I type?',
-    a: 'Your simulations are saved to your account, and only your account can open them. You never need to include names or anything that identifies you; describe the situation, not the people.',
+    a: 'Your simulations are saved to your account, and only you can open them, unless you share a link. A shared page hides your amounts unless you choose to show them, and never shows what you typed. You never need to include names or anything that identifies you; describe the situation, not the people.',
   },
   {
     q: 'What does it cost?',

@@ -19,7 +19,7 @@ const ALLOWED: RegExp[] = [
   /^simulations$/,
   /^simulations\/intake$/,
   /^simulations\/[a-f0-9]{24}$/,
-  /^simulations\/[a-f0-9]{24}\/(answers|model|run|renarrate)$/,
+  /^simulations\/[a-f0-9]{24}\/(answers|model|run|renarrate|share)$/,
   /^billing\/(checkout|portal|sync)$/,
 ];
 

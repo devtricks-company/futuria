@@ -6,31 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input, Label } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Segmented, SegmentedItem } from '@/components/ui/toggle-group';
-import { formatValue } from '@/lib/format';
 import { type FieldValue, validateValue } from '@/lib/model-fields';
-
-/** "low – high (most likely x)" or a single value, in the field's unit. */
-export function describeValue(value: FieldValue, meta: FieldMeta | undefined, currency: string) {
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-  if (typeof value === 'string') return value;
-  const fmt = (n: number) => formatValue(n, meta?.unit, currency);
-  if (typeof value === 'number') return fmt(value);
-  if (value.kind === 'fixed') return fmt(value.value);
-  return `${fmt(value.low)} – ${fmt(value.high)} (most likely ${fmt(value.likely)})`;
-}
-
-/** A value split for display: the range (or single value), and the most likely point apart. */
-export function valueParts(
-  value: FieldValue,
-  meta: FieldMeta | undefined,
-  currency: string,
-): { main: string; likely: string | null } {
-  if (isDistribution(value) && value.kind === 'range') {
-    const fmt = (n: number) => formatValue(n, meta?.unit, currency);
-    return { main: `${fmt(value.low)} – ${fmt(value.high)}`, likely: fmt(value.likely) };
-  }
-  return { main: describeValue(value, meta, currency), likely: null };
-}
 
 type Points = { low: string; likely: string; high: string };
 

@@ -9,6 +9,7 @@ import { createValidationPipe } from './common/validation.js';
 import { validateEnv } from './config/env.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthController } from './health/health.controller.js';
+import { ShareModule } from './share/share.module.js';
 import { SimulationsModule } from './simulations/simulations.module.js';
 import { UsersModule } from './users/users.module.js';
 
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     AuthModule,
     SimulationsModule,
+    ShareModule,
     BillingModule,
   ],
   controllers: [HealthController],

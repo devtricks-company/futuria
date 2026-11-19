@@ -74,7 +74,11 @@ describe('Plan limits and usage (e2e)', () => {
     expect(answers.status).toBe(403);
     expect((await as('rex').get(`/simulations/${id}`).expect(200)).body.analysis).not.toBeNull();
     const refresh = await as('rex').post(`/simulations/${id}/renarrate`).expect(403);
-    expect(refresh.body).toMatchObject({ code: 'plan_feature', requiredPlan: 'pro' });
+    expect(refresh.body).toMatchObject({
+      code: 'plan_feature',
+      requiredPlan: 'pro',
+      feature: 'storyRefresh',
+    });
     expect(await used('rex')).toBe(1);
 
     // On Pro, both work and each uses one run.

@@ -9,6 +9,8 @@ import {
   createSimulationRequestSchema,
   intakeAnswersRequestSchema,
   objectIdSchema,
+  shareRequestSchema,
+  shareSlugSchema,
   statusesThatCanReach,
 } from './simulation';
 
@@ -82,5 +84,26 @@ describe('request schemas', () => {
   it('validates object ids', () => {
     expect(objectIdSchema.safeParse('507f1f77bcf86cd799439011').success).toBe(true);
     expect(objectIdSchema.safeParse('nope').success).toBe(false);
+  });
+
+  it('accepts only random-looking share slugs', () => {
+    expect(shareSlugSchema.safeParse('Ab3_x-9QzLmN').success).toBe(true);
+    for (const bad of [
+      'short',
+      '../simulations',
+      'a b c d e f g',
+      'x'.repeat(33),
+      'abc/defghijk',
+    ]) {
+      expect(shareSlugSchema.safeParse(bad).success).toBe(false);
+    }
+  });
+
+  it('requires both share switches; a new link is optional', () => {
+    expect(shareRequestSchema.parse({ isPublic: true, showNumbers: false })).toEqual({
+      isPublic: true,
+      showNumbers: false,
+    });
+    expect(shareRequestSchema.safeParse({ isPublic: true }).success).toBe(false);
   });
 });

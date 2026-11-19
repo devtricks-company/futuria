@@ -1,36 +1,5 @@
-import type { DecisionModel, SimulationResult } from '@futuria/shared';
-import { runOnce } from '@futuria/engine';
-
-/** One option's simulated futures, ready to draw on the landing page's hero chart. */
-export interface FutureBundle {
-  pathId: string;
-  name: string;
-  /** Position in the model, which picks the path's colour slot. */
-  index: number;
-  /** SVG path data with one subpath per simulated future. */
-  runs: string;
-  /** SVG path data for the median savings curve. */
-  median: string;
-  /** Median savings at the horizon. */
-  end: number;
-  /** Where the median ends, from 0 (top) to 1 (bottom). */
-  endY: number;
-  /** Where the end label goes: endY, nudged so labels don't overlap. */
-  labelY: number;
-  probRunOut: number;
-}
-
-export interface FuturesChart {
-  /** The SVG viewBox size. Coordinates are in these units. */
-  width: number;
-  height: number;
-  horizonMonths: number;
-  startCash: number;
-  /** Fractions of the height (0 = top) for the starting savings and the emergency floor. */
-  startY: number;
-  floorY: number;
-  bundles: FutureBundle[];
-}
+import type { DecisionModel, FuturesChart, SimulationResult } from '@futuria/shared';
+import { runOnce } from './simulate';
 
 export interface FuturesChartOptions {
   seed: number;
@@ -40,12 +9,36 @@ export interface FuturesChartOptions {
   height?: number;
   /** Smallest gap between end labels, as a fraction of the height. */
   labelGap?: number;
+  /**
+   * Leave out amounts (today's savings, each median's end) for public views. The geometry stays:
+   * its scale isn't part of the output, so it reveals shapes, not amounts.
+   */
+  hideMoney?: boolean;
+  /** Most points per line: long horizons are sampled down (always keeping today and the end). */
+  maxPoints?: number;
 }
 
-function pathData(series: ArrayLike<number>, x: (m: number) => number, y: (v: number) => number) {
+/** Months to draw: every month, or evenly spaced ones (always 0 and the horizon) up to `max`. */
+export function chartMonths(horizon: number, max = Infinity): number[] {
+  const all = Array.from({ length: horizon + 1 }, (_, m) => m);
+  if (all.length <= max) return all;
+  const step = horizon / (Math.max(2, Math.floor(max)) - 1);
+  const picked = new Set<number>();
+  for (let k = 0; k * step < horizon; k++) picked.add(Math.round(k * step));
+  picked.add(horizon);
+  return [...picked].sort((a, b) => a - b);
+}
+
+function pathData(
+  series: ArrayLike<number>,
+  months: number[],
+  x: (m: number) => number,
+  y: (v: number) => number,
+) {
   let d = '';
-  for (let m = 0; m < series.length; m++) {
-    d += `${m === 0 ? 'M' : 'L'}${Math.round(x(m))} ${Math.round(y(series[m]!))}`;
+  for (let k = 0; k < months.length; k++) {
+    const m = months[k]!;
+    d += `${k === 0 ? 'M' : 'L'}${Math.round(x(m))} ${Math.round(y(series[m]!))}`;
   }
   return d;
 }
@@ -70,16 +63,26 @@ export function spreadLabels(positions: number[], gap: number): number[] {
 }
 
 /**
- * The hero chart's data: the first `runsPerPath` simulated futures of every path, re-run with the
- * same seed as `result`, so each line is one of the futures behind the published numbers.
+ * Chart data for simulated futures: the first `runsPerPath` futures of every path, re-run with
+ * the same seed as `result`, so each line is one of the futures behind the published numbers.
+ * Used by the landing hero, public share pages, social cards and PDF reports.
  */
 export function futuresChart(
   model: DecisionModel,
   result: SimulationResult,
-  { seed, runsPerPath = 64, width = 1200, height = 400, labelGap = 0.16 }: FuturesChartOptions,
+  {
+    seed,
+    runsPerPath = 64,
+    width = 1200,
+    height = 400,
+    labelGap = 0.16,
+    hideMoney = false,
+    maxPoints,
+  }: FuturesChartOptions,
 ): FuturesChart {
   const H = model.horizonMonths;
   const floor = model.baseline.emergencyFloor;
+  const months = chartMonths(H, maxPoints);
   const runs = model.paths.map((path) =>
     Array.from({ length: runsPerPath }, (_, i) => runOnce(model, path, seed, i).cash),
   );
@@ -90,12 +93,14 @@ export function futuresChart(
   let lo = Math.min(floor, model.baseline.startingCash);
   let hi = Math.max(floor, model.baseline.startingCash);
   for (const series of [...runs.flat(), ...medians]) {
-    for (let m = 0; m < series.length; m++) {
-      lo = Math.min(lo, series[m]!);
-      hi = Math.max(hi, series[m]!);
+    for (const m of months) {
+      const v = series[m];
+      if (v === undefined) continue;
+      lo = Math.min(lo, v);
+      hi = Math.max(hi, v);
     }
   }
-  const pad = (hi - lo) * 0.06;
+  const pad = (hi - lo) * 0.06 || 1;
   lo -= pad;
   hi += pad;
 
@@ -110,16 +115,16 @@ export function futuresChart(
     width,
     height,
     horizonMonths: H,
-    startCash: model.baseline.startingCash,
+    startCash: hideMoney ? null : model.baseline.startingCash,
     startY: frac(model.baseline.startingCash),
     floorY: frac(floor),
     bundles: model.paths.map((path, index) => ({
       pathId: path.id,
       name: path.name,
       index,
-      runs: runs[index]!.map((series) => pathData(series, x, y)).join(''),
-      median: pathData(medians[index]!, x, y),
-      end: ends[index]!,
+      runs: runs[index]!.map((series) => pathData(series, months, x, y)).join(''),
+      median: pathData(medians[index]!, months, x, y),
+      end: hideMoney ? null : ends[index]!,
       endY: frac(ends[index]!),
       labelY: labelY[index]!,
       probRunOut: result.paths.find((p) => p.pathId === path.id)?.metrics.probRunOut ?? 0,

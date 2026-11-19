@@ -8,6 +8,8 @@ import type {
   PlanId,
   Profile,
   ProfileDto,
+  ShareRequest,
+  ShareSettingsDto,
   SimulationDto,
   SimulationSummaryDto,
 } from '@futuria/shared';
@@ -26,6 +28,8 @@ export class ApiError extends Error {
   readonly issues: ApiErrorBody['issues'];
   /** On plan errors: the cheapest plan that would allow the request. */
   readonly requiredPlan: PlanId | undefined;
+  /** On plan_feature errors: the feature that was refused (e.g. "pdfExport"). */
+  readonly feature: ApiErrorBody['feature'];
 
   constructor(status: number, body: Partial<ApiErrorBody> | null) {
     super(body?.message || `Request failed (${status})`);
@@ -34,6 +38,7 @@ export class ApiError extends Error {
     this.code = body?.code;
     this.issues = body?.issues;
     this.requiredPlan = body?.requiredPlan;
+    this.feature = body?.feature;
   }
 
   /** Worth retrying: the server or AI was busy or unavailable, not a problem with the request. */
@@ -93,6 +98,9 @@ export const api = {
     request<SimulationDto>('PATCH', `/simulations/${id}/model`, { model }),
   /** Queue the engine + story pipeline (202); poll getSimulation until ready or failed. */
   run: (id: string) => request<SimulationDto>('POST', `/simulations/${id}/run`),
+  /** Public link settings; the link itself is `/share/<slug>` (lib/share-view.ts). */
+  share: (id: string, body: ShareRequest) =>
+    request<ShareSettingsDto>('POST', `/simulations/${id}/share`, body),
 
   /** Start Stripe Checkout; redirect the browser to the returned URL. */
   checkout: (body: CheckoutRequest) => request<BillingUrlDto>('POST', '/billing/checkout', body),

@@ -17,13 +17,19 @@ export function requiredPlan(
   return plan ?? undefined;
 }
 
-function forbidden(code: string, message: string, plan?: PlanId): ForbiddenException {
+function forbidden(
+  code: string,
+  message: string,
+  plan?: PlanId,
+  extra: Partial<ApiErrorBody> = {},
+): ForbiddenException {
   const body: ApiErrorBody = {
     statusCode: 403,
     error: 'Forbidden',
     code,
     message,
     ...(plan ? { requiredPlan: plan } : {}),
+    ...extra,
   };
   return new ForbiddenException(body);
 }
@@ -55,7 +61,7 @@ const FEATURE_NAMES: Record<PlanFeature, string> = {
   watermarkedShare: 'Watermarked sharing',
 };
 
-/** The feature isn't part of the user's plan. */
+/** The feature isn't part of the user's plan. `feature` lets clients pick the right upsell. */
 export function planFeatureRequired(feature: PlanFeature, plan: PlanId): ForbiddenException {
   const upgrade = requiredPlan((p) => p.features[feature], plan);
   const where = upgrade ? ` It's included in ${PLANS[upgrade].name}.` : '';
@@ -63,6 +69,7 @@ export function planFeatureRequired(feature: PlanFeature, plan: PlanId): Forbidd
     'plan_feature',
     `${FEATURE_NAMES[feature]} isn't part of the ${PLANS[plan].name} plan.${where}`,
     upgrade,
+    { feature },
   );
 }
 

@@ -276,6 +276,15 @@ export class SimulationsService {
     return toSimulationDto(doc);
   }
 
+  /** Everything a PDF report needs (owner only; the route checks the plan). Needs results. */
+  async report(auth: AuthContext, id: string): Promise<SimulationDto> {
+    const simulation = await this.get(auth, id);
+    if (!simulation.analysis || !simulation.model) {
+      throw conflict('not_ready', 'Run the simulation before exporting a report.');
+    }
+    return simulation;
+  }
+
   /** Replace the decision model. Previous results no longer match it, so they are cleared. */
   async updateModel(auth: AuthContext, id: string, model: DecisionModel): Promise<SimulationDto> {
     assertModelWithinPlan(model, auth.plan);

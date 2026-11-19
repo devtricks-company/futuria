@@ -5,7 +5,10 @@ import {
   ArrowLeft,
   CalendarRange,
   Dices,
+  FileDown,
   GitBranch,
+  LoaderCircle,
+  Lock,
   Pencil,
   RefreshCw,
   SlidersHorizontal,
@@ -23,10 +26,11 @@ import {
 import { Notice } from '@/components/notice';
 import { ActionPlan } from '@/components/results/action-plan';
 import { FanChart } from '@/components/results/fan-chart';
-import { PathSwatch } from '@/components/results/path-color';
 import { PathCards } from '@/components/results/path-cards';
+import { PathPicker } from '@/components/results/path-picker';
 import { ProgressScreen } from '@/components/results/progress-screen';
 import { SaveProfile } from '@/components/results/save-profile';
+import { ShareButton } from '@/components/results/share-dialog';
 import { TimeMachine } from '@/components/results/time-machine';
 import { Tornado } from '@/components/results/tornado';
 import { TweakPanel } from '@/components/results/tweak-panel';
@@ -40,27 +44,13 @@ import { useEngine } from '@/engine/use-engine';
 import { ApiError, api, errorMessage, queryKeys } from '@/lib/api';
 import { openGate } from '@/lib/gate-events';
 import { useNavigate } from '@/lib/navigation';
-import { storyUpgrade, upgradeFromError } from '@/lib/plan-gates';
+import { pdfUpgrade, storyUpgrade, upgradeFromError } from '@/lib/plan-gates';
+import { fetchReport, reportFileName, saveFile } from '@/lib/report';
+import { PANEL, SCENARIO_LABELS, defaultPathId } from '@/lib/results-view';
 import { type TweakValues, activeTweaks, applyTweaks, slidersFor } from '@/lib/tweaks';
 import { cn } from '@/lib/utils';
 
-/** A boxed view inside the results frame (chart, drivers, timeline). */
-const PANEL = 'rounded-2xl border border-border bg-surface-muted/40 p-4 sm:p-5';
-
-const SCENARIO_LABELS: Record<ScenarioKey, string> = {
-  optimistic: 'Optimistic',
-  realistic: 'Realistic',
-  pessimistic: 'Pessimistic',
-};
-
 const POLL_MS = 1500;
-
-/** The path the insights open on: the riskiest one that isn't "stay in my job". */
-function defaultPathId(result: SimulationResult): string {
-  const candidates = result.paths.filter((p) => p.type !== 'stay');
-  const pool = candidates.length ? candidates : result.paths;
-  return [...pool].sort((a, b) => b.metrics.probRunOut - a.metrics.probRunOut)[0]!.pathId;
-}
 
 export function SimulationView({ id }: { id: string }) {
   const navigate = useNavigate();
@@ -158,6 +148,16 @@ function Results({ simulation }: { simulation: SimulationDto }) {
     : null;
   const updateStory = () => (upgradeForStory ? upgradeForStory() : rerun.mutate('tweaks'));
 
+  // PDF reports are a paid feature: Free sees a locked button that opens the upgrade dialog.
+  // A plan error from the server opens the same dialog (MutationCache).
+  const report = useMutation({
+    mutationFn: () => fetchReport(simulation.id),
+    onSuccess: (blob) => saveFile(blob, reportFileName(simulation.title)),
+  });
+  const pdfPlan = me.data ? pdfUpgrade(me.data.plan) : null;
+  const downloadReport = () =>
+    pdfPlan ? openGate({ kind: 'upgrade', reason: 'pdf', plan: pdfPlan }) : report.mutate();
+
   const editAll = useMutation({
     mutationFn: () => api.updateModel(simulation.id, model!),
     onSuccess: (updated) => {
@@ -241,35 +241,48 @@ function Results({ simulation }: { simulation: SimulationDto }) {
   );
 
   const pathPicker = (
-    <Segmented
+    <PathPicker
+      paths={result.paths}
       value={selectedPathId}
       onValueChange={setPathId}
-      aria-label="Path"
-      className="flex-wrap gap-2 rounded-none border-0 bg-transparent p-0 sm:w-full"
-    >
-      {result.paths.map((p) => (
-        <SegmentedItem
-          key={p.pathId}
-          value={p.pathId}
-          className="h-9 flex-none gap-2 border border-border bg-surface px-3.5 shadow-card hover:border-border-strong data-[state=on]:border-accent data-[state=on]:bg-accent-soft data-[state=on]:shadow-none"
-        >
-          <PathSwatch index={colorIndex[p.pathId] ?? 0} />
-          {p.name}
-        </SegmentedItem>
-      ))}
-    </Segmented>
+      colorIndex={colorIndex}
+    />
   );
 
   return (
     <div className="flex flex-col gap-6 pb-20 lg:pb-0">
       <header className="flex flex-col gap-3">
-        <Link
-          href="/dashboard"
-          className="inline-flex w-fit items-center gap-1.5 text-sm text-muted transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-3.5" aria-hidden />
-          All simulations
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/dashboard"
+            className="inline-flex w-fit items-center gap-1.5 text-sm text-muted transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" aria-hidden />
+            All simulations
+          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={downloadReport}
+              disabled={!stored || report.isPending}
+              aria-label="Download PDF"
+            >
+              {report.isPending ? (
+                <LoaderCircle className="animate-spin" />
+              ) : pdfPlan ? (
+                <Lock />
+              ) : (
+                <FileDown />
+              )}
+              <span className="sm:hidden">PDF</span>
+              <span className="hidden sm:inline">
+                {report.isPending ? 'Preparing PDF…' : 'Download PDF'}
+              </span>
+            </Button>
+            <ShareButton simulation={simulation} plan={me.data?.plan} />
+          </div>
+        </div>
         <h1 className="font-display text-3xl leading-[1.1] sm:text-4xl">{simulation.title}</h1>
         <p className="max-w-2xl text-base text-muted sm:text-lg">
           &ldquo;{simulation.decisionText}&rdquo;
@@ -311,6 +324,11 @@ function Results({ simulation }: { simulation: SimulationDto }) {
       {rerun.isError && !upgradeFromError(rerun.error) ? (
         <Notice variant="error" title="We couldn't start a new run">
           {errorMessage(rerun.error)}
+        </Notice>
+      ) : null}
+      {report.isError && !upgradeFromError(report.error) ? (
+        <Notice variant="error" title="We couldn't create the PDF">
+          {errorMessage(report.error)}
         </Notice>
       ) : null}
       {engine.error ? (

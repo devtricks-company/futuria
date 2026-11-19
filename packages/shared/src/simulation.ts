@@ -5,7 +5,13 @@ import {
   intakeAnswerSchema,
   proposedPathSchema,
 } from './ai';
-import { type DecisionModel, PATH_TYPES, decisionModelSchema } from './decision-model';
+import type { FuturesChart } from './charts';
+import {
+  type DecisionModel,
+  PATH_TYPES,
+  type PathType,
+  decisionModelSchema,
+} from './decision-model';
 import {
   BILLABLE_PLANS,
   BILLING_INTERVALS,
@@ -110,6 +116,20 @@ export const intakeAnswersRequestSchema = z.object({
 });
 export type IntakeAnswersRequest = z.output<typeof intakeAnswersRequestSchema>;
 
+/** Public share links: random, URL-safe (base64url). Validated before any lookup or fetch. */
+export const shareSlugSchema = z.string().regex(/^[A-Za-z0-9_-]{10,32}$/, 'Invalid share link');
+
+/**
+ * Share settings. `showNumbers` opts in to amounts and stories on the public page (off by
+ * default); `newLink` replaces the slug, so links handed out before stop working.
+ */
+export const shareRequestSchema = z.object({
+  isPublic: z.boolean(),
+  showNumbers: z.boolean(),
+  newLink: z.boolean().optional(),
+});
+export type ShareRequest = z.output<typeof shareRequestSchema>;
+
 /* ---------- Response shapes ---------- */
 
 export interface SimulationDto {
@@ -126,11 +146,76 @@ export interface SimulationDto {
   engineVersion: string | null;
   promptVersion: string | null;
   error: string | null;
-  share: { slug: string | null; isPublic: boolean };
+  share: ShareSettingsDto;
   createdAt: string;
   updatedAt: string;
   lastRunAt: string | null;
 }
+
+export interface ShareSettingsDto {
+  /** Null until the simulation is shared for the first time. */
+  slug: string | null;
+  isPublic: boolean;
+  /** Amounts and stories are public too (opt-in). */
+  showNumbers: boolean;
+}
+
+/** One path on a public share page: chances and months only, never amounts. */
+export interface SharedPathDto {
+  pathId: string;
+  name: string;
+  type: PathType;
+  /** Position in the model, which picks the path's colour slot. */
+  index: number;
+  probRunOut: number;
+  medianRunOutMonth: number | null;
+  probBreakEven: number;
+  medianBreakEvenMonth: number | null;
+  /** The inputs that move the outcome most, with their share of the total swing (0-1). */
+  topDrivers: { label: string; share: number }[];
+  /** Action-plan levers and what they do to the chance of running out. */
+  levers: {
+    label: string;
+    probRunOutBefore: number;
+    probRunOutAfter: number;
+    breakEvenMonthBefore: number | null;
+    breakEvenMonthAfter: number | null;
+  }[];
+}
+
+/**
+ * GET /share/:slug. Built for strangers: it never carries the decision text, intake answers or
+ * the model, and carries amounts (`details`, the chart's money labels) only with `showNumbers`.
+ */
+export interface PublicShareDto {
+  status: 'ready';
+  slug: string;
+  title: string;
+  lastRunAt: string | null;
+  horizonMonths: number;
+  currency: string;
+  /** The owner is on a plan with watermarked shares (Free). */
+  watermark: boolean;
+  showNumbers: boolean;
+  chart: FuturesChart;
+  paths: SharedPathDto[];
+  /** Full engine results and stories, only when the owner opted in to showing numbers. */
+  details: {
+    analysis: FullAnalysis;
+    narrative: Record<string, PathNarrative> | null;
+    emergencyFloor: number;
+  } | null;
+}
+
+/** A shared simulation whose results are being recomputed (the owner edited it). */
+export interface UpdatingShareDto {
+  status: 'updating';
+  slug: string;
+  title: string;
+  watermark: boolean;
+}
+
+export type ShareViewDto = PublicShareDto | UpdatingShareDto;
 
 export interface SimulationSummaryDto {
   id: string;
@@ -211,4 +296,6 @@ export interface ApiErrorBody {
   issues?: { path: string; message: string }[];
   /** On plan errors: the cheapest plan that would allow the request. */
   requiredPlan?: PlanId;
+  /** On plan_feature errors: the feature that was refused (e.g. "pdfExport"). */
+  feature?: keyof PlanLimits['features'];
 }
