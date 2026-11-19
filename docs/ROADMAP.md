@@ -4,15 +4,15 @@ _Explore the Future Before You Live It._
 
 ## Progress
 
-| Phase                | Status                                                                                                     |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- |
-| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                     |
-| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms         |
-| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)    |
-| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open  |
-| 4. Web app MVP       | 🟡 Built (2026-11-17): Playwright journey green on desktop + mobile (fixture). Manual real-Claude run open |
-| 5. Accounts, billing | ✅ Done (2026-11-19): Clerk sign-up, test-card upgrades, plan changes via the Stripe CLI webhook           |
-| 6–11                 | Not started                                                                                                |
+| Phase                | Status                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                    |
+| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms        |
+| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)   |
+| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open |
+| 4. Web app MVP       | ✅ Done (2026-11-19): Playwright journey green on desktop + mobile (fixture), manual real-Claude run OK   |
+| 5. Accounts, billing | ✅ Done (2026-11-19): Clerk sign-up, test-card upgrades, plan changes via the Stripe CLI webhook          |
+| 6–11                 | Not started                                                                                               |
 
 **Phase 2 notes (deviations from the plan below):**
 
@@ -58,7 +58,7 @@ _Explore the Future Before You Live It._
   - `pnpm check` (web unit tests included)
   - Playwright (`pnpm --filter @futuria/web test:e2e`): Sara's journey, profile pre-fill, out-of-scope and crisis routing, each on desktop and a Pixel 7 viewport, against the built API in fixture mode
   - a screenshot pass in light and dark
-- **Open for ✅:** a manual run with real Claude on a phone and a desktop (your part; about $0.40 per run, plus about $0.25 per "Update the story").
+- **Manual ✅ check (2026-11-19):** a run with real Claude on a phone and a desktop went well (about $0.40 per run, plus about $0.25 per "Update the story").
 - **Deviations from the plan above:**
   - **API access goes through a same-origin proxy** (`app/api/backend/[...path]`, endpoint allowlist). The browser never holds the API URL or a token. It adds the Clerk token, or the dev identity in `AUTH_MODE=dev`.
   - **"Update the story" runs the simulation again** (`PATCH /model` with the tweaks, then `POST /run`) instead of calling `/renarrate`, which reuses the stored numbers and would describe the old future. The cost is the same as a story refresh.
