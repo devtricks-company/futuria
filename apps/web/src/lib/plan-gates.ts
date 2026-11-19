@@ -17,7 +17,8 @@ import { ApiError } from './api';
  * spends time (or AI) on something their plan won't run.
  */
 
-export type UpgradeReason = 'quota' | 'horizon' | 'paths' | 'story' | 'limits';
+export type UpgradeReason =
+  'quota' | 'horizon' | 'paths' | 'story' | 'limits' | 'watermark' | 'pdf';
 
 export interface UpgradeRequest {
   reason: UpgradeReason;
@@ -40,10 +41,18 @@ const REASON_BY_CODE: Record<string, UpgradeReason> = {
   plan_limit: 'limits',
 };
 
+/** plan_feature errors name the feature; the ones with their own upsell copy. */
+const REASON_BY_FEATURE: Partial<Record<keyof PlanLimits['features'], UpgradeReason>> = {
+  pdfExport: 'pdf',
+  storyRefresh: 'story',
+};
+
 /** An upgrade to offer for an API plan error, or null (not a plan error, or nothing to buy). */
 export function upgradeFromError(error: unknown): UpgradeRequest | null {
   if (!(error instanceof ApiError) || !error.code) return null;
-  const reason = REASON_BY_CODE[error.code];
+  const reason =
+    (error.code === 'plan_feature' && error.feature && REASON_BY_FEATURE[error.feature]) ||
+    REASON_BY_CODE[error.code];
   const plan = error.requiredPlan;
   if (!reason || !plan || !isBillablePlan(plan)) return null;
   return { reason, plan };
@@ -76,6 +85,18 @@ export function storyUpgrade(plan: PlanId): BillablePlanId | null {
   return upgradeTo((p) => p.features.storyRefresh, plan);
 }
 
+/** The plan that exports PDF reports, or null if this plan can. */
+export function pdfUpgrade(plan: PlanId): BillablePlanId | null {
+  if (PLANS[plan].features.pdfExport) return null;
+  return upgradeTo((p) => p.features.pdfExport, plan);
+}
+
+/** The plan whose shared pages carry no watermark, or null if this plan's don't. */
+export function watermarkUpgrade(plan: PlanId): BillablePlanId | null {
+  if (!PLANS[plan].features.watermarkedShare) return null;
+  return upgradeTo((p) => !p.features.watermarkedShare, plan);
+}
+
 /** The plan with more simulations, for when the quota is used up. */
 export function quotaUpgrade(plan: PlanId): BillablePlanId | null {
   return upgradeTo((p) => p.simulations > PLANS[plan].simulations, plan);
@@ -102,11 +123,19 @@ export const UPGRADE_COPY: Record<UpgradeReason, { title: string; body: string }
     title: 'This simulation needs a bigger plan',
     body: 'Longer horizons and more paths come with a paid plan.',
   },
+  pdf: {
+    title: 'Download your futures as a PDF',
+    body: 'Paid plans export a full report: every path, the chart, what matters most, the Time Machine, the action plan and every assumption.',
+  },
+  watermark: {
+    title: 'Share without the watermark',
+    body: 'On paid plans, your shared pages and link previews show your futures without the FUTURIA free-plan watermark.',
+  },
 };
 
 const FEATURE_LABELS: [keyof PlanLimits['features'], string][] = [
   ['storyRefresh', 'Update the story after tweaks'],
-  ['pdfExport', 'PDF export (soon)'],
+  ['pdfExport', 'PDF reports'],
   ['realityCheck', 'Monthly Reality Check (soon)'],
   ['askTheFuture', 'Ask the Future chat (soon)'],
   ['advancedVariables', 'Taxes, inflation and more variables (soon)'],

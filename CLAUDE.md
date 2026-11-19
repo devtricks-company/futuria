@@ -12,7 +12,7 @@ when its ✅ checks pass.
 | Path              | What                                                                                                                         |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `packages/shared` | Zod schemas (`DecisionModel`, profile), engine result types, plan limits, `FIELD_META` (units, bounds), `SARA_MODEL` fixture |
-| `packages/engine` | Pure-TS Monte Carlo engine, used by the browser (Web Worker) and the API                                                     |
+| `packages/engine` | Pure-TS Monte Carlo engine, used by the browser (Web Worker) and the API; `futuresChart` geometry for charts and cards       |
 | `packages/config` | Shared tsconfig and ESLint presets                                                                                           |
 | `apps/api`        | NestJS 12 API (ESM)                                                                                                          |
 | `apps/web`        | Next.js 16 App Router (Cache Components on), Tailwind 4                                                                      |
@@ -29,6 +29,7 @@ pnpm --filter @futuria/engine demo    # Sara's 3 paths: metrics, sensitivity, ac
 pnpm --filter @futuria/web test       # web unit tests (pure helpers in src/lib)
 pnpm --filter @futuria/web test:e2e   # Playwright: Sara's journey, desktop + mobile (run `pnpm build` first)
 pnpm --filter @futuria/web build:e2e  # rebuild the web app without Clerk (needed when .env.local has Clerk keys)
+pnpm --filter @futuria/web share:preview https://<tunnel>  # share cards on a public URL for link debuggers (docs/TESTING.md)
 pnpm --filter @futuria/api test:e2e       # throwaway futuria_test_* databases on MONGODB_TEST_URI or local MongoDB
 pnpm --filter @futuria/api db:setup       # create collections + indexes in the futuria database
 pnpm --filter @futuria/api db:setup --seed  # ...and add Sara's sample simulation for dev-user
@@ -105,6 +106,14 @@ changing `shared` or `engine` outside `pnpm dev`, rebuild them (`pnpm build` or 
   `plan_limit` / `plan_feature` / `quota_exceeded` with `requiredPlan` (`common/plan-errors.ts`). Status changes go through
   `SimulationsService.transition` (an atomic conditional update using `statusesThatCanReach`).
   Errors use the `ApiErrorBody` shape `{ statusCode, error, code, message, issues? }`.
+  `watermarkedShare` is a restriction (true on Free only): read `PLANS[plan].features`, never
+  use it with `@RequiresFeature`.
+- **Sharing (`apps/api/src/share`):** the public view (`PublicShareDto`, built by
+  `share.mapper.ts`) never carries the decision text, the answers, the model, or any money unless
+  the owner turned on `showNumbers`. Levers go out by label only (their descriptions contain
+  amounts), and the chart is `futuresChart(..., { hideMoney })` geometry on an unlabeled scale.
+  A new public field must pass the no-leak test in `test/share.e2e-spec.ts`. Validate a slug with
+  `shareSlugSchema` before putting it in a URL: `new URL('/share/' + slug)` collapses `..`.
 - **Next.js 16 differs from older docs.** Read `apps/web/node_modules/next/dist/docs/` before
   writing Next code. With Cache Components, uncached data (fetches, cookies) must sit inside
   `<Suspense>`.
@@ -161,6 +170,21 @@ changing `shared` or `engine` outside `pnpm dev`, rebuild them (`pnpm build` or 
     so an untweaked model reproduces the stored results. `useEngine` keeps only the latest model.
   - Chart colours: `--series-1..8` in `globals.css` (validated categorical palette; colour follows
     the path's position in the model). Charts ship a legend and a table view.
+  - **Share pages, social cards, PDF:** `/share/[slug]` reads the API with no identity
+    (`lib/share.ts`). Satori (`next/og` cards) and react-pdf (`app/api/report/[id]`, rendered
+    on the server) can't read CSS variables or web fonts: use `SERIES_HEX`
+    (`lib/series-colors.ts`, a test keeps it in sync with `globals.css`) and the TTFs in
+    `assets/fonts`. The report component uses no hooks or context and is not `'use client'`.
+    Absolute URLs (og:image, canonical, sitemap) come from `NEXT_PUBLIC_SITE_URL`, read at build
+    time.
+  - **Analytics (PostHog, `lib/analytics.ts`):** off without `NEXT_PUBLIC_POSTHOG_KEY`
+    (`NEXT_PUBLIC_POSTHOG_REGION` us/eu). Call `track()` with a typed event; properties carry plan
+    names, counts and flags, never decision text, amounts, names or emails. People are identified
+    by Clerk id only. Events go through the `app/ingest` relay (no rewrite: it would forward the
+    Clerk session). A new URL parameter with private data goes in `PRIVATE_PARAMS`.
+  - The `src/proxy.ts` matcher skips social cards (`opengraph-image`), `.xml`/`.txt` and
+    `ingest/`. Clerk development instances answer cookieless page requests (link-preview bots)
+    with a handshake redirect, so link previews need production keys or Clerk off.
   - Pure logic lives in `src/lib` with Vitest tests; UI flows are covered by Playwright (`e2e/`).
     The e2e run starts the built API from `apps/web` (so it never reads `apps/api/.env`) on :4100
     with fixture AI and a `futuria_test_web_e2e` database, and `next start` on :3100.

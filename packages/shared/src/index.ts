@@ -1,6 +1,7 @@
 export * from './distribution';
 export * from './decision-model';
 export * from './results';
+export * from './charts';
 export * from './plans';
 export * from './usage';
 export * from './field-labels';

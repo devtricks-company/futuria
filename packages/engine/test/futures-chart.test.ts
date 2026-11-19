@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { SARA_MODEL, decisionModelSchema } from '@futuria/shared';
-import { simulate } from '@futuria/engine';
-import { DEMO_SEED } from './demo';
-import { futuresChart, spreadLabels } from './futures';
+import { chartMonths, futuresChart, spreadLabels } from '../src/futures-chart';
+import { simulate } from '../src/simulate';
 
+const DEMO_SEED = 20261116;
 const model = decisionModelSchema.parse(SARA_MODEL);
 const result = simulate(model, { seed: DEMO_SEED, runs: 200 });
 const chart = futuresChart(model, result, { seed: DEMO_SEED, runsPerPath: 12 });
@@ -46,6 +46,50 @@ describe('futuresChart', () => {
 
   it('is deterministic for a seed', () => {
     expect(futuresChart(model, result, { seed: DEMO_SEED, runsPerPath: 12 })).toEqual(chart);
+  });
+
+  it('leaves out every amount when money is hidden, keeping the same geometry', () => {
+    const hidden = futuresChart(model, result, {
+      seed: DEMO_SEED,
+      runsPerPath: 12,
+      hideMoney: true,
+    });
+    expect(hidden.startCash).toBeNull();
+    expect(hidden.bundles.every((b) => b.end === null)).toBe(true);
+    expect(hidden.bundles.map((b) => b.runs)).toEqual(chart.bundles.map((b) => b.runs));
+    expect(hidden.startY).toBe(chart.startY);
+  });
+
+  it('samples long horizons down to maxPoints per line', () => {
+    const long = decisionModelSchema.parse({ ...SARA_MODEL, horizonMonths: 60 });
+    const longResult = simulate(long, { seed: DEMO_SEED, runs: 100 });
+    const small = futuresChart(long, longResult, {
+      seed: DEMO_SEED,
+      runsPerPath: 4,
+      maxPoints: 25,
+    });
+    const points = small.bundles[0]!.median.match(/[ML]/g) ?? [];
+    expect(points.length).toBeLessThanOrEqual(25);
+    expect(
+      small.bundles[0]!.median.endsWith(
+        `${small.width} ${Math.round(small.bundles[0]!.endY * small.height)}`,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('chartMonths', () => {
+  it('keeps every month when there is room', () => {
+    expect(chartMonths(12)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(chartMonths(12, 25)).toHaveLength(13);
+  });
+
+  it('spreads at most max months evenly, always keeping today and the horizon', () => {
+    const months = chartMonths(60, 25);
+    expect(months.length).toBeLessThanOrEqual(25);
+    expect(months[0]).toBe(0);
+    expect(months[months.length - 1]).toBe(60);
+    expect(new Set(months).size).toBe(months.length);
   });
 });
 

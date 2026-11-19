@@ -1,7 +1,8 @@
 import { Fragment } from 'react';
 import { formatMoney } from '@futuria/engine';
+import type { FuturesChart as ChartData } from '@futuria/shared';
 import { PathSwatch, pathColor } from '@/components/results/path-color';
-import type { FuturesChart as ChartData } from '@/lib/futures';
+import { formatPercent } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const pct = (fraction: number) => `${(fraction * 100).toFixed(2)}%`;
@@ -19,7 +20,8 @@ function keepHyphenated(text: string) {
 /**
  * The hero: real simulated futures fanning out from today's savings. Lines are SVG stretched to
  * the box (strokes stay 1px); every label is HTML positioned by percentage, so text never
- * distorts. On load the futures unfold from left to right, once.
+ * distorts. On load the futures unfold from left to right, once. Charts with hidden money
+ * (public shares) label the start "Today" and each path with its chance of running out.
  */
 export function FuturesChart({
   data,
@@ -47,7 +49,7 @@ export function FuturesChart({
             className="absolute left-3 mt-2 text-xs font-medium text-danger"
             style={{ top: pct(floorY) }}
           >
-            {formatMoney(0, currency)}: out of money
+            {startCash === null ? 'Out of money' : `${formatMoney(0, currency)}: out of money`}
           </p>
 
           <div
@@ -96,7 +98,7 @@ export function FuturesChart({
             className="absolute left-3 hidden -translate-y-[calc(100%+1.5rem)] text-sm font-medium tabular-nums [text-shadow:0_0_4px_var(--background),0_0_8px_var(--background)] sm:block"
             style={{ top: pct(startY) }}
           >
-            {formatMoney(startCash, currency)} today
+            {startCash === null ? 'Today' : `${formatMoney(startCash, currency)} today`}
           </p>
 
           <ol
@@ -104,11 +106,17 @@ export function FuturesChart({
             className="absolute inset-x-0 top-full mt-2 flex justify-between text-xs text-muted"
           >
             <li>
-              <span className="font-medium text-foreground tabular-nums sm:hidden">
-                {formatMoney(startCash, currency)}{' '}
-              </span>
-              <span className="sm:hidden">today</span>
-              <span className="hidden sm:inline">Today</span>
+              {startCash !== null ? (
+                <>
+                  <span className="font-medium text-foreground tabular-nums sm:hidden">
+                    {formatMoney(startCash, currency)}{' '}
+                  </span>
+                  <span className="sm:hidden">today</span>
+                  <span className="hidden sm:inline">Today</span>
+                </>
+              ) : (
+                'Today'
+              )}
             </li>
             <li>Month {mid}</li>
             <li>Month {data.horizonMonths}</li>
@@ -123,7 +131,7 @@ export function FuturesChart({
               className="absolute inset-x-0 -translate-y-1/2"
               style={{ top: pct(b.labelY) }}
             >
-              <EndLabel name={b.name} index={b.index} end={b.end} currency={currency} />
+              <EndLabel bundle={b} currency={currency} />
             </li>
           ))}
         </ul>
@@ -132,10 +140,10 @@ export function FuturesChart({
       {/* Small screens: a legend in the chart's top-to-bottom order. */}
       <ul className="mt-10 flex flex-col gap-3 sm:hidden">
         {[...bundles]
-          .sort((a, b) => b.end - a.end)
+          .sort((a, b) => a.endY - b.endY)
           .map((b) => (
             <li key={b.pathId}>
-              <EndLabel name={b.name} index={b.index} end={b.end} currency={currency} inline />
+              <EndLabel bundle={b} currency={currency} inline />
             </li>
           ))}
       </ul>
@@ -144,15 +152,11 @@ export function FuturesChart({
 }
 
 function EndLabel({
-  name,
-  index,
-  end,
+  bundle: { name, index, end, probRunOut },
   currency,
   inline,
 }: {
-  name: string;
-  index: number;
-  end: number;
+  bundle: ChartData['bundles'][number];
   currency: string;
   inline?: boolean;
 }) {
@@ -163,7 +167,9 @@ function EndLabel({
         <span>{keepHyphenated(name)}</span>
       </span>
       <span className={cn('block text-muted tabular-nums', !inline && 'pl-5.5')}>
-        {formatMoney(end, currency)} typical
+        {end === null
+          ? `${formatPercent(probRunOut)} chance of running out`
+          : `${formatMoney(end, currency)} typical`}
       </span>
     </p>
   );

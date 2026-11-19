@@ -65,6 +65,20 @@ export class SimulationsController {
     return this.simulations.get(auth, id);
   }
 
+  /**
+   * The simulation for a PDF report (Pro and up). The web app renders the PDF; this route is
+   * where the plan is enforced.
+   */
+  @Get(':id/report')
+  @UseGuards(PlanGuard)
+  @RequiresFeature('pdfExport')
+  report(
+    @CurrentUser() auth: AuthContext,
+    @Param('id', { schema: objectIdSchema }) id: string,
+  ): Promise<SimulationDto> {
+    return this.simulations.report(auth, id);
+  }
+
   @AllowAnonymous()
   @Patch(':id/answers')
   saveAnswers(

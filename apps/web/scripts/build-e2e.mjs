@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 const result = spawnSync('pnpm', ['exec', 'next', 'build'], {
   stdio: 'inherit',
   shell: process.platform === 'win32',
-  env: { ...process.env, NEXT_PUBLIC_CLERK_DISABLED: '1' },
+  // No analytics from test runs, even if .env.local has a PostHog key.
+  env: { ...process.env, NEXT_PUBLIC_CLERK_DISABLED: '1', NEXT_PUBLIC_POSTHOG_KEY: '' },
 });
 process.exit(result.status ?? 1);

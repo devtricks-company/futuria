@@ -1,9 +1,18 @@
-import type { SimulationDto, SimulationSummaryDto } from '@futuria/shared';
+import type { ShareSettingsDto, SimulationDto, SimulationSummaryDto } from '@futuria/shared';
 import type { Simulation } from './simulation.schema.js';
 
 type StoredSimulation = Simulation & { _id: unknown };
 
-const iso = (date: Date | null | undefined) => (date ? new Date(date).toISOString() : null);
+export const iso = (date: Date | null | undefined) => (date ? new Date(date).toISOString() : null);
+
+/** Share settings; documents from before `showNumbers` existed keep amounts private. */
+export function toShareSettings(share: StoredSimulation['share'] | undefined): ShareSettingsDto {
+  return {
+    slug: share?.slug ?? null,
+    isPublic: share?.isPublic ?? false,
+    showNumbers: share?.showNumbers ?? false,
+  };
+}
 
 export function toSimulationDto(doc: StoredSimulation): SimulationDto {
   return {
@@ -19,7 +28,7 @@ export function toSimulationDto(doc: StoredSimulation): SimulationDto {
     engineVersion: doc.engineVersion ?? null,
     promptVersion: doc.promptVersion ?? null,
     error: doc.error ?? null,
-    share: { slug: doc.share?.slug ?? null, isPublic: doc.share?.isPublic ?? false },
+    share: toShareSettings(doc.share),
     createdAt: iso(doc.createdAt)!,
     updatedAt: iso(doc.updatedAt)!,
     lastRunAt: iso(doc.lastRunAt),

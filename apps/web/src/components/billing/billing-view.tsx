@@ -10,6 +10,7 @@ import { Notice } from '@/components/notice';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { track } from '@/lib/analytics';
 import { api, errorMessage, queryKeys } from '@/lib/api';
 import { parseUpgradeParams, quotaLeft, quotaUpgrade } from '@/lib/plan-gates';
 import { cn } from '@/lib/utils';
@@ -97,7 +98,16 @@ export function BillingView() {
     api
       .syncBilling(landing.sessionId)
       .then(() => queryClient.fetchQuery({ queryKey: queryKeys.me, queryFn: api.me }))
-      .then((fresh) => setArrival({ kind: 'welcome', plan: PLANS[fresh.plan].name }))
+      .then((fresh) => {
+        // Funnel step: back from Checkout on a paid plan.
+        if (fresh.plan !== 'free') {
+          track('upgraded', {
+            plan: fresh.plan,
+            interval: fresh.billing.subscription?.interval ?? null,
+          });
+        }
+        setArrival({ kind: 'welcome', plan: PLANS[fresh.plan].name });
+      })
       .catch((error: unknown) => setArrival({ kind: 'sync-failed', message: errorMessage(error) }));
   }, [landing, queryClient]);
 

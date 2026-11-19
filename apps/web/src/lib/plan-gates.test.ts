@@ -10,19 +10,22 @@ import {
   priceLabel,
   quotaLeft,
   quotaUpgrade,
+  pdfUpgrade,
   storyUpgrade,
   upgradeFromError,
   upgradeHref,
+  watermarkUpgrade,
   yearlySavings,
 } from './plan-gates';
 
-const apiError = (status: number, code: string, requiredPlan?: string) =>
+const apiError = (status: number, code: string, requiredPlan?: string, feature?: string) =>
   new ApiError(status, {
     statusCode: status,
     error: 'x',
     message: 'm',
     code,
     requiredPlan: requiredPlan as never,
+    feature: feature as never,
   });
 
 describe('plan gates', () => {
@@ -32,6 +35,14 @@ describe('plan gates', () => {
       plan: 'pro',
     });
     expect(upgradeFromError(apiError(403, 'plan_feature', 'pro'))?.reason).toBe('story');
+    // Each feature gets its own copy: a refused PDF isn't about the story.
+    expect(upgradeFromError(apiError(403, 'plan_feature', 'pro', 'pdfExport'))).toEqual({
+      reason: 'pdf',
+      plan: 'pro',
+    });
+    expect(upgradeFromError(apiError(403, 'plan_feature', 'pro', 'storyRefresh'))?.reason).toBe(
+      'story',
+    );
     expect(upgradeFromError(apiError(403, 'plan_limit', 'premium'))).toEqual({
       reason: 'limits',
       plan: 'premium',
@@ -65,6 +76,10 @@ describe('plan gates', () => {
     expect(quotaUpgrade('free')).toBe('pro');
     expect(quotaUpgrade('pro')).toBe('premium');
     expect(quotaUpgrade('premium')).toBeNull();
+    expect(pdfUpgrade('free')).toBe('pro');
+    expect(pdfUpgrade('pro')).toBeNull();
+    expect(watermarkUpgrade('free')).toBe('pro');
+    expect(watermarkUpgrade('pro')).toBeNull();
   });
 
   it('describes plans and prices', () => {

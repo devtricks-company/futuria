@@ -10,6 +10,7 @@ import {
   metaForField,
 } from '@futuria/shared';
 import { withField } from '@futuria/engine';
+import { formatValue } from './format';
 
 /*
  * The assumptions review lists every editable model value, grouped by baseline and path, with
@@ -180,6 +181,33 @@ export function restoreField(
     next.assumptions = next.assumptions.map((a) => (a.id === id ? { ...a, source } : a));
   }
   return next;
+}
+
+/** "low – high (most likely x)" or a single value, in the field's unit. */
+export function describeValue(
+  value: FieldValue,
+  meta: FieldMeta | undefined,
+  currency: string,
+): string {
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'string') return value;
+  const fmt = (n: number) => formatValue(n, meta?.unit, currency);
+  if (typeof value === 'number') return fmt(value);
+  if (value.kind === 'fixed') return fmt(value.value);
+  return `${fmt(value.low)} – ${fmt(value.high)} (most likely ${fmt(value.likely)})`;
+}
+
+/** A value split for display: the range (or single value), and the most likely point apart. */
+export function valueParts(
+  value: FieldValue,
+  meta: FieldMeta | undefined,
+  currency: string,
+): { main: string; likely: string | null } {
+  if (isDistribution(value) && value.kind === 'range') {
+    const fmt = (n: number) => formatValue(n, meta?.unit, currency);
+    return { main: `${fmt(value.low)} – ${fmt(value.high)}`, likely: fmt(value.likely) };
+  }
+  return { main: describeValue(value, meta, currency), likely: null };
 }
 
 /** A problem with a value, or null if it is usable. */

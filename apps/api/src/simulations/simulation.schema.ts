@@ -55,13 +55,15 @@ export class Simulation {
   @Prop({ type: String, default: null })
   error: string | null;
 
+  /** Public link (`/share/:slug`). Amounts and stories are public only with `showNumbers`. */
   @Prop(
     raw({
       slug: { type: String, default: null },
       isPublic: { type: Boolean, default: false },
+      showNumbers: { type: Boolean, default: false },
     }),
   )
-  share: { slug: string | null; isPublic: boolean };
+  share: { slug: string | null; isPublic: boolean; showNumbers?: boolean };
 
   /** Per-call Claude usage and cost records. */
   @Prop({ type: [Object], default: [] })

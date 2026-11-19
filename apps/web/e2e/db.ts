@@ -1,4 +1,5 @@
 import { MongoClient } from 'mongodb';
+import type { PlanId } from '@futuria/shared';
 
 /** One throwaway database for the web e2e run; never the app's `futuria` database. */
 export const E2E_DATABASE = 'futuria_test_web_e2e';
@@ -19,6 +20,24 @@ export async function dropE2eDatabase(): Promise<void> {
   try {
     await client.connect();
     await client.db(E2E_DATABASE).dropDatabase();
+  } finally {
+    await client.close();
+  }
+}
+
+/**
+ * Put a dev user on a plan, as a Stripe sync would. The user must exist already (any API call
+ * as that user creates it); updating instead of upserting keeps the API's defaults.
+ */
+export async function setPlan(devUser: string, plan: PlanId): Promise<void> {
+  const client = new MongoClient(e2eMongoUri(), { serverSelectionTimeoutMS: 10_000 });
+  try {
+    await client.connect();
+    const res = await client
+      .db(E2E_DATABASE)
+      .collection('users')
+      .updateOne({ externalId: `dev:${devUser}` }, { $set: { plan } });
+    if (res.matchedCount !== 1) throw new Error(`No user dev:${devUser} to put on ${plan}`);
   } finally {
     await client.close();
   }

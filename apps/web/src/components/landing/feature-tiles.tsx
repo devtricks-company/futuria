@@ -240,7 +240,10 @@ export function FeatureTiles({
 
 const PRIVACY = [
   { icon: SlidersHorizontal, text: 'Sliders run on your device and cost nothing.' },
-  { icon: LockKeyhole, text: 'Only your account can open your simulations.' },
+  {
+    icon: LockKeyhole,
+    text: 'Only you can open your simulations, unless you share a link. Amounts stay hidden unless you show them.',
+  },
   { icon: Eye, text: 'Describe your decision without names; we never need them.' },
 ] as const;
 

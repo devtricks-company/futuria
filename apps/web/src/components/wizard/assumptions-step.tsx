@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Segmented, SegmentedItem } from '@/components/ui/toggle-group';
 import { Stepper } from '@/components/wizard/stepper';
-import { ValueEditor, valueParts } from '@/components/wizard/value-editor';
+import { ValueEditor } from '@/components/wizard/value-editor';
+import { track } from '@/lib/analytics';
 import { api, errorMessage, queryKeys } from '@/lib/api';
 import { openGate } from '@/lib/gate-events';
 import { useNavigate } from '@/lib/navigation';
@@ -22,6 +23,7 @@ import {
   groupFields,
   restoreField,
   setFieldValue,
+  valueParts,
 } from '@/lib/model-fields';
 import { PATH_TYPE_HINTS } from '@/lib/paths';
 import { horizonUpgrade, isSignupRequired } from '@/lib/plan-gates';
@@ -594,12 +596,24 @@ export function AssumptionsStep({
               </Button>
             ) : null}
             {anonymous ? (
-              <Button onClick={() => gate.mutate()} disabled={busy || editingKey !== null}>
+              <Button
+                onClick={() => {
+                  track('model_reviewed', { paths: pathCount, signedIn: false });
+                  gate.mutate();
+                }}
+                disabled={busy || editingKey !== null}
+              >
                 <Play />
                 {gate.isPending ? 'Saving…' : `See my ${pathCount} futures`}
               </Button>
             ) : (
-              <Button onClick={() => run.mutate()} disabled={busy || editingKey !== null}>
+              <Button
+                onClick={() => {
+                  track('model_reviewed', { paths: pathCount, signedIn: true });
+                  run.mutate();
+                }}
+                disabled={busy || editingKey !== null}
+              >
                 <Play />
                 {run.isPending || run.isSuccess ? 'Starting…' : 'Run simulation'}
               </Button>

@@ -22,4 +22,5 @@ export {
 } from './model-utils';
 export { sampleDistribution, triangularInverse, monthlyHazard } from './distributions';
 export { mulberry32, randomSeed } from './rng';
+export { chartMonths, futuresChart, spreadLabels, type FuturesChartOptions } from './futures-chart';
 export { WEEKS_PER_MONTH } from './paths';

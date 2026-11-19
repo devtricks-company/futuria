@@ -2,10 +2,12 @@ import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
+import { AnalyticsIdentity } from '@/components/analytics/analytics-identity';
 import { Providers } from '@/components/providers';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { clerkEnabled } from '@/lib/clerk';
+import { SITE_URL } from '@/lib/site';
 import { THEME_SCRIPT } from '@/lib/theme';
 import './globals.css';
 
@@ -15,10 +17,16 @@ const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
 });
 
+const DESCRIPTION =
+  'Simulate a career decision before you make it: thousands of possible futures, your chance of running out of money, and what you can do about it.';
+
 export const metadata: Metadata = {
+  // Absolute URLs for social cards and canonical links (lib/site.ts).
+  metadataBase: new URL(SITE_URL),
   title: { default: 'FUTURIA: explore the future before you live it', template: '%s · FUTURIA' },
-  description:
-    'Simulate a career decision before you make it: thousands of possible futures, your chance of running out of money, and what you can do about it.',
+  description: DESCRIPTION,
+  openGraph: { type: 'website', siteName: 'FUTURIA', description: DESCRIPTION },
+  twitter: { card: 'summary_large_image' },
 };
 
 export const viewport: Viewport = {
@@ -64,6 +72,8 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         </a>
         <Auth>
           <Providers>
+            {/* Needs ClerkProvider, so only with Clerk on. */}
+            {clerkEnabled ? <AnalyticsIdentity /> : null}
             <SiteHeader />
             <div id="main" className="flex flex-1 flex-col">
               {children}

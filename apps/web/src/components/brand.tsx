@@ -1,7 +1,11 @@
 import { cn } from '@/lib/utils';
 
 /** Three futures fanning out from one starting point: the brand mark and the loader. */
-const FAN = ['M4 12C10 12 12.5 5.5 20 5.5', 'M4 12H20', 'M4 12C10 12 12.5 18.5 20 18.5'] as const;
+export const FAN = [
+  'M4 12C10 12 12.5 5.5 20 5.5',
+  'M4 12H20',
+  'M4 12C10 12 12.5 18.5 20 18.5',
+] as const;
 
 /** The app-icon tile: a dark fan on the brand gradient. */
 export function LogoMark({ className }: { className?: string }) {

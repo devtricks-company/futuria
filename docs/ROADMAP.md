@@ -4,15 +4,16 @@ _Explore the Future Before You Live It._
 
 ## Progress
 
-| Phase                | Status                                                                                                    |
-| -------------------- | --------------------------------------------------------------------------------------------------------- |
-| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                    |
-| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms        |
-| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)   |
-| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open |
-| 4. Web app MVP       | ✅ Done (2026-11-19): Playwright journey green on desktop + mobile (fixture), manual real-Claude run OK   |
-| 5. Accounts, billing | ✅ Done (2026-11-19): Clerk sign-up, test-card upgrades, plan changes via the Stripe CLI webhook          |
-| 6–11                 | Not started                                                                                               |
+| Phase                | Status                                                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                         |
+| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms             |
+| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)        |
+| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open      |
+| 4. Web app MVP       | ✅ Done (2026-11-19): Playwright journey green on desktop + mobile (fixture), manual real-Claude run OK        |
+| 5. Accounts, billing | ✅ Done (2026-11-19): Clerk sign-up, test-card upgrades, plan changes via the Stripe CLI webhook               |
+| 6. Share and growth  | ✅ Done (2026-11-19): share cards correct in a link debugger (Free watermarked), all 7 funnel steps in PostHog |
+| 7–11                 | Not started                                                                                                    |
 
 **Phase 2 notes (deviations from the plan below):**
 
@@ -118,6 +119,66 @@ _Explore the Future Before You Live It._
   - **Fixed a phone layout bug from the UI redesign.** The drifting background glow scaled past the screen edge, widening the page by up to about 12 px on phones. That made taps miss (flaky mobile e2e) and let the page wobble sideways. Its container now clips.
   - **The smoke script runs as a new Free user each time,** so it never hits the 3-simulation limit.
   - **Business isn't sold yet** (Phase 10). A full Premium quota just waits for the next period.
+
+**Phase 6 status and notes (2026-11-19):**
+
+- **Built:**
+  - **Share links.**
+    - `POST /simulations/:id/share` (account needed) takes `isPublic`, `showNumbers` and `newLink`. "New link" replaces the slug, so old links stop working.
+    - `GET /share/:slug` is public and never cached, so turning sharing off takes effect at once.
+    - Slugs are 12 random URL-safe characters (72 bits) with a unique index.
+    - **No amounts unless the owner opts in.**
+      - Always public: the title, path names, chances of running out and break-even months, the top three drivers and levers (labels only), and the futures chart's shape on an unlabeled scale.
+      - Public only with "Show amounts and stories": money, the stories and the full results.
+      - Never public: the decision text, the answers and the model.
+      - An API e2e test checks the response for Sara's amounts and decision text.
+    - After a model change, the link shows "being updated" until the new run finishes.
+  - **Share page `/share/[slug]`:**
+    - risk cards, drivers, levers, and the full results when shared
+    - a call to action, and a watermark band on Free
+    - `noindex`, and "This link isn't shared anymore" for a private or unknown link
+  - **Social cards (`next/og`):**
+    - `/share/<slug>/opengraph-image` shows the futures' shape and each path's chances, plus a "Made with FUTURIA · free plan" band on Free. Cards never show amounts.
+    - Every other page gets a site card.
+    - The fonts are Plus Jakarta Sans TTFs in `apps/web/assets/fonts` (OFL).
+  - **PDF report (Pro and up):**
+    - `GET /api/report/<id>` renders it with `@react-pdf/renderer` from the API's plan-gated `GET /simulations/:id/report`.
+    - Contents: summary, futures chart, what matters most, the realistic Time Machine, action plan and assumptions.
+    - On Free, "Download PDF" opens the upgrade dialog.
+  - **PostHog funnel:**
+    - Funnel: `landing_viewed → intake_started → model_reviewed → signed_up → results_viewed → shared → upgraded`.
+    - Extra events: `share_viewed`, `share_link_copied` and `pdf_exported`.
+    - Nothing loads without `NEXT_PUBLIC_POSTHOG_KEY`.
+  - **SEO pages:** three static pages, each with a prefilled form, a sample person's simulated futures, an FAQ (with `FAQPage` data) and a canonical URL:
+    - `/should-i-quit-my-job-to-freelance`
+    - `/freelance-runway-calculator`
+    - `/quit-job-to-start-a-startup`
+    - The site also has `sitemap.xml`, `robots.txt` and a "Simulators" footer column.
+- **Verified:**
+  - `pnpm check` passes: shared 27, engine 43, web 63, API unit 57, API e2e 52.
+  - Playwright passes 28/28 (14 tests on desktop and mobile), twice in a row. The new tests cover:
+    - sharing, and opening the link signed out
+    - social cards, the PDF gate and download, analytics off by default, and the SEO pages
+  - `pnpm --filter @futuria/web share:preview` serves both share cards to a bot user agent through a public URL.
+- **✅ checks with you:**
+  - **Link debugger (2026-11-19):** `share:preview` ran through a Cloudflare quick tunnel. The link debugger showed both cards: the Free one with the "Made with FUTURIA · free plan" band, the Pro one without it.
+  - **PostHog funnel (2026-11-19):** a manual walk-through from the landing page through a Clerk sign-up to a Stripe Checkout upgrade. The PostHog funnel insight shows all 7 steps, `landing_viewed` through `upgraded`.
+- **Deviations and findings:**
+  - **`futuresChart` moved from the web app into `@futuria/engine`,** so the API builds the public chart. New options: `hideMoney`, and `maxPoints` to keep share responses small.
+  - **Analytics go through the app's own `/ingest` route,** not a `next.config` rewrite. A rewrite would forward cookies and the Clerk session to PostHog.
+    - No autocapture and no session recording.
+    - `q` (the decision text from the landing form) and `session_id` are stripped from every URL.
+    - People are identified by their Clerk id only.
+    - `skipTrailingSlashRedirect` is on, because PostHog's paths end in `/`.
+  - **Clerk development instances redirect bots.** A page request without cookies gets a 307 to Clerk's dev-browser handshake, so link-preview bots never see the share page's tags. Production keys don't do this. The local check runs with Clerk off (`share:preview`).
+  - **`robots.txt` doesn't block `/share/`.** Link-preview bots obey robots.txt, so share pages carry `noindex` instead.
+  - The Clerk proxy skips social cards, `sitemap.xml`, `robots.txt` and `/ingest/`.
+  - **PDF via react-pdf, not a print route in a headless browser.** This was decided with you: it needs no Chromium on the server.
+  - **Deferred to Phase 7's security pass:** rate limiting on the public share route. With 72-bit slugs, guessing links isn't practical.
+  - **Known gaps:**
+    - `upgraded` fires on return from Checkout, so plan changes in the Customer Portal aren't counted (a server-side event from the webhook comes later).
+    - `signed_up` needs Clerk.
+    - The action plan's "before" risk comes from 500 runs while the path cards use 1,000, so the two can differ slightly (older than Phase 6).
 
 ## Context
 
@@ -305,13 +366,13 @@ Settings: 3 retries, concurrency of 2 per user, global throttle. Inngest is moun
 
 ### 4. API surface (NestJS)
 
-| Area        | Endpoints                                                                                                                                                                                                                                                                                                                              |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Simulations | `POST /simulations/intake` · `PATCH /simulations/:id/answers` · `POST /simulations/:id/model` · `PATCH /simulations/:id/model` (edit assumptions) · `POST /simulations/:id/run` (202, queues Inngest) · `GET /simulations/:id` (status, results, narrative; polled by the UI) · `GET /simulations` · `POST /simulations/:id/renarrate` |
-| Sharing     | `POST /simulations/:id/share` · `GET /share/:slug` (public)                                                                                                                                                                                                                                                                            |
-| Profile     | `GET/PUT /me/profile`                                                                                                                                                                                                                                                                                                                  |
-| Billing     | `POST /billing/checkout` · `POST /billing/portal` · `POST /billing/webhook`                                                                                                                                                                                                                                                            |
-| Inngest     | `POST /api/inngest`                                                                                                                                                                                                                                                                                                                    |
+| Area        | Endpoints                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Simulations | `POST /simulations/intake` · `PATCH /simulations/:id/answers` · `POST /simulations/:id/model` · `PATCH /simulations/:id/model` (edit assumptions) · `POST /simulations/:id/run` (202, queues Inngest) · `GET /simulations/:id` (status, results, narrative; polled by the UI) · `GET /simulations` · `POST /simulations/:id/renarrate` · `GET /simulations/:id/report` (Pro, PDF data) |
+| Sharing     | `POST /simulations/:id/share` · `GET /share/:slug` (public)                                                                                                                                                                                                                                                                                                                            |
+| Profile     | `GET/PUT /me/profile`                                                                                                                                                                                                                                                                                                                                                                  |
+| Billing     | `POST /billing/checkout` · `POST /billing/portal` · `POST /billing/webhook`                                                                                                                                                                                                                                                                                                            |
+| Inngest     | `POST /api/inngest`                                                                                                                                                                                                                                                                                                                                                                    |
 
 Cross-cutting concerns:
 
@@ -510,4 +571,4 @@ Things you'll need to set up yourself when we reach them:
 - MongoDB Atlas, Vercel, and Railway or Fly (Phase 0 deploy, which can be deferred)
 - Inngest account (Phase 3)
 - Stripe or another merchant of record (Phase 5)
-- Sentry and PostHog (Phase 7)
+- PostHog (Phase 6) and Sentry (Phase 7)

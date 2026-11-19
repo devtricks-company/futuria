@@ -42,7 +42,14 @@ test('Free plan gates open the upgrade dialog', async ({ page, isMobile }) => {
   await savings.focus();
   await savings.press('End');
   await expect(page.getByText("You're exploring tweaked numbers")).toBeVisible();
-  await page.getByRole('button', { name: 'Update the story' }).first().click();
+  // On phones the open Tweak sheet covers the lower half of the page; its own button is the one
+  // to tap. On desktop, the notice's button.
+  const updateStory = isMobile
+    ? page
+        .getByRole('dialog', { name: 'Tweak the future' })
+        .getByRole('button', { name: 'Update the story' })
+    : page.getByRole('button', { name: 'Update the story' }).first();
+  await updateStory.click();
   const story = page.getByRole('dialog', { name: 'Update the story with your changes' });
   await expect(story).toBeVisible();
   await expect(story.getByText('Recommended')).toBeVisible();
