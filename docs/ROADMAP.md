@@ -11,7 +11,7 @@ _Explore the Future Before You Live It._
 | 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)    |
 | 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open  |
 | 4. Web app MVP       | 🟡 Built (2026-11-17): Playwright journey green on desktop + mobile (fixture). Manual real-Claude run open |
-| 5. Accounts, billing | 🟡 Built (2026-11-18): gates, quotas, Stripe (fake-Stripe e2e). Manual Clerk + Stripe test-mode run open   |
+| 5. Accounts, billing | ✅ Done (2026-11-19): Clerk sign-up, test-card upgrades, plan changes via the Stripe CLI webhook           |
 | 6–11                 | Not started                                                                                                |
 
 **Phase 2 notes (deviations from the plan below):**
@@ -107,9 +107,11 @@ _Explore the Future Before You Live It._
     - quotas, rollover, concurrency and refunds
     - billing with a fake Stripe client and real webhook signatures
   - Playwright passes twice in a row on desktop and mobile, including the new upgrade-dialog journey.
-- **Open for ✅:**
-  - A manual run with your Clerk dev keys: remove `AUTH_MODE=dev` from `apps/api/.env`.
-  - Stripe test mode: create the account, `stripe:setup`, `stripe:listen`, then upgrade with card 4242 (see `docs/TESTING.md` section 12).
+- **✅ checks, done by hand (2026-11-19):**
+  - **Clerk:** the API runs in Clerk mode with the dev keys. Real Clerk accounts signed up and ran simulations.
+  - **Stripe test mode:** `stripe:setup` created the four prices and the portal configuration. Two accounts upgraded to Pro through Checkout with card 4242, and their quotas restarted at the Stripe period start.
+  - **Plan via the webhook:** with `stripe:listen` running, a subscription was switched Pro → Premium → Pro through the Stripe API only (no `/billing/sync`, no proration). Both `customer.subscription.updated` events returned 200, the user's plan followed within about 3 s, and the usage count was unchanged.
+  - **Limits:** `pnpm turbo run lint typecheck test --force` and Playwright (10/10, including the upgrade dialog on desktop and mobile) passed on the same code.
 - **Deviations and findings:**
   - **Changing a finished simulation on Free is refused.** "Update the story" saved the model (clearing the stored results) before running, so on Free the results would have been lost behind a refused run.
   - **E2E builds must not have Clerk.** `apps/web/.env.local` has Clerk keys now, so `pnpm build` produces a Clerk app that the dev-identity tests can't sign in to. Use `pnpm --filter @futuria/web build:e2e` (it sets `NEXT_PUBLIC_CLERK_DISABLED=1`).
