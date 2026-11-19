@@ -4,16 +4,16 @@ _Explore the Future Before You Live It._
 
 ## Progress
 
-| Phase                | Status                                                                                                                        |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                                        |
-| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms                            |
-| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)                       |
-| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open                     |
-| 4. Web app MVP       | ✅ Done (2026-11-19): Playwright journey green on desktop + mobile (fixture), manual real-Claude run OK                       |
-| 5. Accounts, billing | ✅ Done (2026-11-19): Clerk sign-up, test-card upgrades, plan changes via the Stripe CLI webhook                              |
-| 6. Share and growth  | Built (2026-11-19): share links, social cards, PDF, PostHog funnel, SEO pages. Link debugger ✅; PostHog funnel check pending |
-| 7–11                 | Not started                                                                                                                   |
+| Phase                | Status                                                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                         |
+| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms             |
+| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)        |
+| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open      |
+| 4. Web app MVP       | ✅ Done (2026-11-19): Playwright journey green on desktop + mobile (fixture), manual real-Claude run OK        |
+| 5. Accounts, billing | ✅ Done (2026-11-19): Clerk sign-up, test-card upgrades, plan changes via the Stripe CLI webhook               |
+| 6. Share and growth  | ✅ Done (2026-11-19): share cards correct in a link debugger (Free watermarked), all 7 funnel steps in PostHog |
+| 7–11                 | Not started                                                                                                    |
 
 **Phase 2 notes (deviations from the plan below):**
 
@@ -162,7 +162,7 @@ _Explore the Future Before You Live It._
   - `pnpm --filter @futuria/web share:preview` serves both share cards to a bot user agent through a public URL.
 - **✅ checks with you:**
   - **Link debugger (2026-11-19):** `share:preview` ran through a Cloudflare quick tunnel. The link debugger showed both cards: the Free one with the "Made with FUTURIA · free plan" band, the Pro one without it.
-  - **PostHog funnel:** pending.
+  - **PostHog funnel (2026-11-19):** a manual walk-through from the landing page through a Clerk sign-up to a Stripe Checkout upgrade. The PostHog funnel insight shows all 7 steps, `landing_viewed` through `upgraded`.
 - **Deviations and findings:**
   - **`futuresChart` moved from the web app into `@futuria/engine`,** so the API builds the public chart. New options: `hideMoney`, and `maxPoints` to keep share responses small.
   - **Analytics go through the app's own `/ingest` route,** not a `next.config` rewrite. A rewrite would forward cookies and the Clerk session to PostHog.
