@@ -9,6 +9,7 @@ import { ungroundedFigures } from '../ai/grounding.js';
 import { buildNarrativeFacts } from '../ai/narrative-facts.js';
 import { PROMPT_SET_VERSION } from '../ai/prompts/index.js';
 import { Simulation } from '../simulations/simulation.schema.js';
+import { UsageService } from '../users/usage.service.js';
 import type { ClaimedRun, PathStory, RunJob } from './pipeline.types.js';
 
 export const ENGINE_FAILED_MESSAGE = 'The simulation engine failed on this model.';
@@ -34,6 +35,7 @@ export class PipelineService {
   constructor(
     @InjectModel(Simulation.name) private readonly simulations: Model<Simulation>,
     @Inject(AI_PROVIDER) private readonly ai: AiProvider,
+    private readonly usage: UsageService,
   ) {}
 
   private owned(job: RunJob) {
@@ -154,20 +156,25 @@ export class PipelineService {
                 : null,
           },
           $push: { aiUsage: { $each: written.flatMap((s) => (s.usage ? [s.usage] : [])) } },
+          $inc: { completedRuns: 1 },
         },
       )
       .exec();
     return updated.modifiedCount === 1;
   }
 
-  /** Mark the run failed (after retries are exhausted, or inline on the first error). */
+  /**
+   * Mark the run failed (after retries are exhausted, or inline on the first error). A failed
+   * run doesn't count against the quota: the run it used is given back, once.
+   */
   async fail(job: RunJob, message: string): Promise<void> {
-    await this.simulations
+    const updated = await this.simulations
       .updateOne(
         { ...this.owned(job), status: { $in: BUSY_STATUSES } },
         { $set: { status: 'failed', error: message } },
       )
       .exec();
+    if (updated.modifiedCount === 1 && job.charged) await this.usage.refund(job.userId);
   }
 
   /** All steps in-process, for PIPELINE_MODE=inline. */

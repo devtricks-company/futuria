@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
@@ -11,7 +11,11 @@ import { Label, Textarea } from '@/components/ui/input';
 import { INTAKE_MESSAGES, Working } from '@/components/wizard/working';
 import { api, errorMessage, queryKeys } from '@/lib/api';
 import { EXAMPLE_DECISIONS } from '@/lib/examples';
+import { openGate } from '@/lib/gate-events';
 import { useNavigate } from '@/lib/navigation';
+import { quotaLeft, quotaUpgrade, upgradeFromError } from '@/lib/plan-gates';
+
+const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 
 const MIN = 5;
 const MAX = 1000;
@@ -22,6 +26,13 @@ export function DecisionForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [text, setText] = useState(() => (params.get('q') ?? '').slice(0, MAX));
+  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  // No runs left: say so before Claude reads a decision that couldn't be simulated.
+  const outOfRuns = me.data !== undefined && !me.data.anonymous && quotaLeft(me.data) === 0;
+  const upgrade = me.data ? quotaUpgrade(me.data.plan) : null;
+  const resets = me.data?.usage.periodEnd
+    ? dateFormat.format(new Date(me.data.usage.periodEnd))
+    : null;
 
   const intake = useMutation({
     mutationFn: (decisionText: string) => api.intake(decisionText),
@@ -46,6 +57,27 @@ export function DecisionForm() {
         if (trimmed.length >= MIN) intake.mutate(trimmed);
       }}
     >
+      {outOfRuns ? (
+        <Notice
+          variant="warning"
+          title="You've used all your simulations"
+          action={
+            upgrade ? (
+              <Button
+                size="sm"
+                onClick={() => openGate({ kind: 'upgrade', reason: 'quota', plan: upgrade })}
+              >
+                See plans
+              </Button>
+            ) : undefined
+          }
+        >
+          {upgrade
+            ? 'Upgrade to simulate a new decision. Your finished simulations and their sliders stay available.'
+            : `Your simulations reset${resets ? ` on ${resets}` : ' at the start of your next billing period'}.`}
+        </Notice>
+      ) : null}
+
       <Card className="flex flex-col gap-3 shadow-pop">
         <Label htmlFor="decision" className="text-base">
           What decision are you thinking about?
@@ -71,7 +103,7 @@ export function DecisionForm() {
             <span className="pl-1 text-xs text-muted tabular-nums">
               {trimmed.length}/{MAX}
             </span>
-            <Button type="submit" disabled={trimmed.length < MIN}>
+            <Button type="submit" disabled={trimmed.length < MIN || outOfRuns}>
               Continue
               <ArrowRight />
             </Button>
@@ -79,7 +111,7 @@ export function DecisionForm() {
         </div>
       </Card>
 
-      {intake.isError ? (
+      {intake.isError && !upgradeFromError(intake.error) ? (
         <Notice variant="error" title="We couldn't read your decision">
           {errorMessage(intake.error)}
         </Notice>

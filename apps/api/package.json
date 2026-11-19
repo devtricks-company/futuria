@@ -13,6 +13,8 @@
     "ai:probe": "tsx scripts/ai-probe.ts",
     "eval": "tsx evals/run-eval.ts",
     "fixtures:record": "tsx scripts/record-fixtures.ts",
+    "stripe:setup": "tsx scripts/stripe-setup.ts",
+    "stripe:listen": "tsx scripts/stripe-listen.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests && vitest run --config ./vitest.config.e2e.ts",
@@ -33,6 +35,7 @@
     "mongoose": "9.12.1",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
+    "stripe": "23.1.0",
     "zod": "4.6.7"
   },
   "devDependencies": {

@@ -6,8 +6,9 @@ import { AppModule } from './app.module.js';
 import type { Env } from './config/env.js';
 
 async function bootstrap() {
+  // rawBody: Stripe webhook signatures are checked against the exact bytes received.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   // Decision models and results are JSON-heavy; 1 MB is plenty and still bounded.
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useBodyParser('json', { limit: '1mb' });
 
   const config = app.get<ConfigService<Env, true>>(ConfigService);

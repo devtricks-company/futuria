@@ -77,6 +77,7 @@ export function Wizard({ id }: { id: string }) {
 
   const sim = simulation.data;
   const limits = me.data?.limits ?? PLANS.free;
+  const plan = me.data?.plan ?? 'free';
   const routing = sim.intake?.routing;
   if (routing && routing !== 'ok') {
     return <RoutedScreen routing={routing} decisionText={sim.decisionText} />;
@@ -88,7 +89,8 @@ export function Wizard({ id }: { id: string }) {
         // A rebuilt model starts a fresh editor.
         key={sim.updatedAt}
         simulation={sim}
-        maxHorizonMonths={limits.maxHorizonMonths}
+        plan={plan}
+        anonymous={me.data?.anonymous ?? false}
         onEditAnswers={sim.intake ? () => setEditingAnswers(true) : undefined}
       />
     );
@@ -100,6 +102,7 @@ export function Wizard({ id }: { id: string }) {
         simulation={sim}
         profile={profile.data?.profile ?? null}
         maxPaths={limits.maxPaths}
+        plan={plan}
         onCancel={editingAnswers ? () => setEditingAnswers(false) : undefined}
       />
     );

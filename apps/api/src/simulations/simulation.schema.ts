@@ -74,6 +74,17 @@ export class Simulation {
   @Prop({ type: String, default: null })
   promptVersion: string | null;
 
+  /**
+   * Finished runs, never reset (model edits clear the results but not this). A run after the
+   * first one is a story update, a paid feature.
+   */
+  @Prop({ type: Number, default: 0 })
+  completedRuns: number;
+
+  /** Drafts of anonymous visitors expire (TTL index) unless claimed at signup; else null. */
+  @Prop({ type: Date, default: null })
+  expiresAt: Date | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,6 +93,7 @@ export type SimulationDocument = HydratedDocument<Simulation>;
 export const SimulationSchema = SchemaFactory.createForClass(Simulation);
 
 SimulationSchema.index({ userId: 1, createdAt: -1 });
+SimulationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 SimulationSchema.index(
   { 'share.slug': 1 },
   { unique: true, partialFilterExpression: { 'share.slug': { $type: 'string' } } },

@@ -11,7 +11,7 @@ import { readFixture } from '../src/ai/fixture-store.js';
 import { normalizeIntake } from '../src/ai/normalize.js';
 import { PipelineService } from '../src/pipeline/pipeline.service.js';
 import { Simulation } from '../src/simulations/simulation.schema.js';
-import { closeTestApp, createTestApp, settlePipeline } from './test-app.js';
+import { closeTestApp, createTestApp, setPlan, settlePipeline } from './test-app.js';
 
 /*
  * Sara's journey through the AI flow in AI_MODE=fixture (synthetic Claude output, no API calls)
@@ -42,6 +42,8 @@ describe('AI flow (e2e, fixture mode)', () => {
 
   beforeAll(async () => {
     app = await createTestApp();
+    // Story refresh and re-runs are paid features; plan limits are covered by usage.e2e-spec.
+    await setPlan(app, 'sara', 'premium');
   });
 
   afterAll(async () => {
@@ -130,16 +132,16 @@ describe('AI flow (e2e, fixture mode)', () => {
   });
 
   it('builds at most as many paths as the plan allows', async () => {
-    const started = await intake(DECISION);
+    const free = as('free-sara');
+    const started = (
+      await free.post('/simulations/intake').send({ decisionText: DECISION }).expect(201)
+    ).body as SimulationDto;
     const paths = [
       ...started.intake!.result.proposedPaths,
       { id: 'new-job', name: 'Switch jobs', type: 'newJob', summary: '' },
     ];
-    await sara()
-      .patch(`/simulations/${started.id}/answers`)
-      .send({ answers: {}, paths })
-      .expect(200);
-    const modeled = await sara().post(`/simulations/${started.id}/model`).expect(200);
+    await free.patch(`/simulations/${started.id}/answers`).send({ answers: {}, paths }).expect(200);
+    const modeled = await free.post(`/simulations/${started.id}/model`).expect(200);
     expect(modeled.body.model.paths).toHaveLength(3); // Free plan: 3 paths
   });
 
@@ -198,11 +200,14 @@ describe('AI flow (e2e, fixture mode)', () => {
     expect(Object.keys(partial.narrative!).sort()).toEqual(['freelance', 'stay']);
     expect(partial.error).toMatch(/could not be written for: hybrid/);
 
-    // A retryable error that outlasts the retries: the run fails with a public message.
+    // A retryable error that outlasts the retries: the run fails with a public message, and
+    // gives back the run it used.
+    const usedBefore = (await sara().get('/me').expect(200)).body.usage.simulationsUsed as number;
     spy.mockRejectedValue(new AiError('unavailable', 'gateway down', true));
     await sara().post(`/simulations/${id}/run`).expect(202);
     const failed = await settleAndGet(id);
     expect(failed.status).toBe('failed');
+    expect((await sara().get('/me').expect(200)).body.usage.simulationsUsed).toBe(usedBefore);
     expect(failed.error).toBe('The AI service is unavailable right now. Please try again shortly.');
     expect(failed.analysis).not.toBeNull(); // the engine results were stored before narrating
     spy.mockRestore();

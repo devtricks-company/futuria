@@ -21,6 +21,15 @@ export interface BackendRequest {
   /** JSON text, forwarded as-is. */
   body?: string;
   devUser?: string;
+  /** Anonymous visitor id (see lib/anon.ts), sent as x-anon-id. */
+  anonId?: string;
+  /** The Clerk session token, when the caller already has it. */
+  token?: string | null;
+}
+
+/** The signed-in user's Clerk session token, or null (signed out, or Clerk disabled). */
+export async function sessionToken(): Promise<string | null> {
+  return clerkEnabled ? await (await auth()).getToken() : null;
 }
 
 /** Call the API as the current user: Clerk session token when signed in, else the dev identity. */
@@ -28,9 +37,10 @@ export async function backendFetch(path: string, init: BackendRequest = {}): Pro
   const headers = new Headers({ accept: 'application/json' });
   if (init.body !== undefined) headers.set('content-type', 'application/json');
 
-  const token = clerkEnabled ? await (await auth()).getToken() : null;
+  const token = init.token !== undefined ? init.token : await sessionToken();
   if (token) headers.set('authorization', `Bearer ${token}`);
   if (init.devUser && DEV_USER_PATTERN.test(init.devUser)) headers.set('x-dev-user', init.devUser);
+  if (init.anonId) headers.set('x-anon-id', init.anonId);
 
   return fetch(new URL(path, API_URL), {
     method: init.method ?? 'GET',

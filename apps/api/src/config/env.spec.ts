@@ -65,6 +65,17 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ AI_PROMPT_CACHE: 'maybe' })).toThrow(/true, false, 1 or 0/);
   });
 
+  it('disables billing until Stripe keys are configured', () => {
+    expect(validateEnv({}).BILLING_MODE).toBe('disabled');
+    expect(
+      validateEnv({ STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_WEBHOOK_SECRET: 'whsec_x' })
+        .BILLING_MODE,
+    ).toBe('stripe');
+    expect(() => validateEnv({ STRIPE_SECRET_KEY: 'sk_test_x' })).toThrow(
+      /requires STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET/,
+    );
+  });
+
   it('uses Inngest with the Dev Server or cloud keys', () => {
     expect(validateEnv({ INNGEST_DEV: '1' }).PIPELINE_MODE).toBe('inngest');
     expect(
@@ -79,16 +90,23 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...prod, ANTHROPIC_API_KEY: 'k' })).toThrow(
       /PIPELINE_MODE=inline is not allowed/,
     );
-    const ok = validateEnv({
+    const services = {
       ...prod,
       ANTHROPIC_API_KEY: 'k',
       INNGEST_EVENT_KEY: 'evt',
       INNGEST_SIGNING_KEY: 'signkey-x',
+    };
+    expect(() => validateEnv(services)).toThrow(/BILLING_MODE=disabled is not allowed/);
+    const ok = validateEnv({
+      ...services,
+      STRIPE_SECRET_KEY: 'sk_live_x',
+      STRIPE_WEBHOOK_SECRET: 'whsec_x',
     });
     expect(ok).toMatchObject({
       AUTH_MODE: 'clerk',
       AI_MODE: 'anthropic',
       PIPELINE_MODE: 'inngest',
+      BILLING_MODE: 'stripe',
     });
   });
 

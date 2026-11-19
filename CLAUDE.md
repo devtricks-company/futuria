@@ -28,6 +28,7 @@ pnpm --filter @futuria/engine test    # engine unit + property tests
 pnpm --filter @futuria/engine demo    # Sara's 3 paths: metrics, sensitivity, action plan, timing
 pnpm --filter @futuria/web test       # web unit tests (pure helpers in src/lib)
 pnpm --filter @futuria/web test:e2e   # Playwright: Sara's journey, desktop + mobile (run `pnpm build` first)
+pnpm --filter @futuria/web build:e2e  # rebuild the web app without Clerk (needed when .env.local has Clerk keys)
 pnpm --filter @futuria/api test:e2e       # throwaway futuria_test_* databases on MONGODB_TEST_URI or local MongoDB
 pnpm --filter @futuria/api db:setup       # create collections + indexes in the futuria database
 pnpm --filter @futuria/api db:setup --seed  # ...and add Sara's sample simulation for dev-user
@@ -37,6 +38,8 @@ pnpm eval --fixture                       # free dry run of the AI eval harness
 pnpm eval --yes                           # real-Claude eval of 30 personas (~$9; run before prompt changes)
 pnpm eval --replay evals/results/<file>.json   # re-score a saved run for free (after changing checks)
 pnpm --filter @futuria/api fixtures:record --yes   # record real intake/model outputs for AI_MODE=fixture
+pnpm --filter @futuria/api stripe:setup   # Stripe products, monthly/yearly prices, Customer Portal (test key)
+pnpm --filter @futuria/api stripe:listen  # Stripe CLI webhook forwarding (events from billing/webhook-events.ts); copy whsec_ to STRIPE_WEBHOOK_SECRET
 npx inngest-cli@latest dev -u http://localhost:4000/api/inngest   # Inngest Dev Server (UI on :8288)
 ```
 
@@ -52,7 +55,19 @@ npx inngest-cli@latest dev -u http://localhost:4000/api/inngest   # Inngest Dev 
   service container.
 - **Auth:** with no `CLERK_SECRET_KEY`, the API runs in `AUTH_MODE=dev`. The user comes from the
   `x-dev-user` header (default `dev-user`) and is stored as `dev:<name>`. Dev mode is refused
-  when `NODE_ENV=production`.
+  when `NODE_ENV=production`. An explicit `AUTH_MODE=dev` wins over a Clerk key; when the web app
+  has Clerk keys the API must run in Clerk mode.
+- **Anonymous visitors (signup gate):** a request with only `x-anon-id` (a UUID the web proxy keeps
+  in the httpOnly `futuria_anon` cookie, Clerk mode only) is an anonymous user `anon:<uuid>`. It
+  may only reach `@AllowAnonymous()` routes (the wizard up to the run); everything else answers
+  401 `signup_required`. Max 3 drafts; anonymous users and their drafts expire (TTL, 14 days).
+  The first signed-in request that still carries `x-anon-id` claims the drafts (`ClaimService`).
+- **Billing:** with no `STRIPE_SECRET_KEY`, `BILLING_MODE=disabled` and checkout answers 503
+  `billing_disabled`. Stripe mode needs `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`; production
+  refuses disabled. Prices are found by lookup key (`priceLookupKey`, e.g. `futuria_pro_month`).
+  The webhook (`POST /billing/webhook`, raw body, `rawBody: true` in `main.ts`) never trusts the
+  event payload: `syncCustomer` re-reads the subscriptions from Stripe. E2E tests force disabled;
+  `billing.e2e-spec.ts` swaps in a fake `STRIPE` provider and signs webhooks with a test secret.
 - **Claude:** with no `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`, the API runs in
   `AI_MODE=fixture`: recorded outputs (`apps/api/fixtures/ai/`) when the input matches exactly,
   else deterministic synthetic ones (`src/ai/synthetic.ts`). No API calls, no cost. Calls can go
@@ -80,7 +95,14 @@ changing `shared` or `engine` outside `pnpm dev`, rebuild them (`pnpm build` or 
   `StandardSchemaValidationPipe` from `common/validation.ts`). Request schemas, the status
   machine and response DTO types live in `packages/shared/src/simulation.ts`.
 - **API conventions:** every route requires auth unless marked `@Public()`. Queries are scoped
-  to the owner, so another user's simulation is a 404. Status changes go through
+  to the owner, so another user's simulation is a 404.
+- **Plan limits (`packages/shared/src/plans.ts`):** every run (first run, "Update the story",
+  renarrate) uses one simulation from the quota via `UsageService.consume` (atomic conditional
+  `$inc`; monthly periods roll from `usage.periodStart`, Stripe renewals re-anchor them). Failed
+  runs and queue failures are refunded (`RunJob.charged`). A finished simulation
+  (`completedRuns > 0`) can only change (answers, model, run) with `features.storyRefresh`.
+  Route-level features use `@UseGuards(PlanGuard)` + `@RequiresFeature(...)`. Plan errors are 403
+  `plan_limit` / `plan_feature` / `quota_exceeded` with `requiredPlan` (`common/plan-errors.ts`). Status changes go through
   `SimulationsService.transition` (an atomic conditional update using `statusesThatCanReach`).
   Errors use the `ApiErrorBody` shape `{ statusCode, error, code, message, issues? }`.
 - **Next.js 16 differs from older docs.** Read `apps/web/node_modules/next/dist/docs/` before
@@ -129,6 +151,12 @@ changing `shared` or `engine` outside `pnpm dev`, rebuild them (`pnpm build` or 
     static shells; dynamic `params` are awaited inside `<Suspense>` (Cache Components).
   - Navigate after a mutation with `useNavigate()` (`lib/navigation.ts`), not bare
     `router.push`: Clerk's `router.refresh()` on load can swallow a pending push.
+  - Plan gates: `openGate()` (`lib/gate-events.ts`) opens the upgrade dialog or the signup gate
+    (`components/billing/gate-provider.tsx`). The `MutationCache` opens it for any mutation that
+    fails with a plan error, so locked controls only need to call `openGate` before spending.
+    Gate logic (which plan to suggest, copy) lives in `lib/plan-gates.ts`.
+  - `NEXT_PUBLIC_CLERK_DISABLED=1` forces Clerk off even with keys (`build:e2e`). Root-level
+    providers must not use dynamic hooks like `usePathname` (they block prerendering).
   - Sliders recompute in a Web Worker (`engine/engine.worker.ts`, Comlink) with the stored seed,
     so an untweaked model reproduces the stored results. `useEngine` keeps only the latest model.
   - Chart colours: `--series-1..8` in `globals.css` (validated categorical palette; colour follows

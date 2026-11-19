@@ -72,14 +72,24 @@ const envSchema = z.object({
   INNGEST_DEV: flag(false),
   INNGEST_EVENT_KEY: optionalSecret,
   INNGEST_SIGNING_KEY: optionalSecret,
+
+  /*
+   * Billing. "stripe" sells Pro and Premium through Stripe Checkout; "disabled" (no keys: local
+   * dev, CI) answers checkout with 503 billing_disabled. Production requires Stripe.
+   */
+  BILLING_MODE: z.enum(['stripe', 'disabled']).optional(),
+  STRIPE_SECRET_KEY: optionalSecret,
+  /** Signing secret of the webhook endpoint (`stripe listen` prints one for local testing). */
+  STRIPE_WEBHOOK_SECRET: optionalSecret,
 });
 
 type ParsedEnv = z.output<typeof envSchema>;
 
-export type Env = Omit<ParsedEnv, 'AUTH_MODE' | 'AI_MODE' | 'PIPELINE_MODE'> & {
+export type Env = Omit<ParsedEnv, 'AUTH_MODE' | 'AI_MODE' | 'PIPELINE_MODE' | 'BILLING_MODE'> & {
   AUTH_MODE: 'clerk' | 'dev';
   AI_MODE: 'anthropic' | 'fixture';
   PIPELINE_MODE: 'inngest' | 'inline';
+  BILLING_MODE: 'stripe' | 'disabled';
   WEB_ORIGINS: string[];
 };
 
@@ -121,11 +131,20 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     }
   }
 
+  const billingMode = env.BILLING_MODE ?? (env.STRIPE_SECRET_KEY ? 'stripe' : 'disabled');
+  if (billingMode === 'disabled' && production) {
+    throw new Error('BILLING_MODE=disabled is not allowed in production. Set STRIPE_SECRET_KEY.');
+  }
+  if (billingMode === 'stripe' && (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET)) {
+    throw new Error('BILLING_MODE=stripe requires STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET.');
+  }
+
   return {
     ...env,
     AUTH_MODE: authMode,
     AI_MODE: aiMode,
     PIPELINE_MODE: pipelineMode,
+    BILLING_MODE: billingMode,
     WEB_ORIGINS: env.WEB_ORIGIN.split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),

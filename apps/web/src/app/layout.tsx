@@ -48,7 +48,11 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       </head>
       <body className="relative isolate flex min-h-full flex-col overflow-x-clip">
         {/* The green glow and faint grid behind the top of every page. */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[46rem]">
+        {/* overflow-hidden: the drifting glow scales up, which would widen the page on phones. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[46rem] overflow-hidden"
+        >
           <div className="bg-glow absolute inset-0 motion-safe:animate-[glow-drift_14s_ease-in-out_infinite]" />
           <div className="bg-grid absolute inset-0" />
         </div>

@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   type CreateSimulationRequest,
   type IntakeAnswersRequest,
@@ -12,8 +22,10 @@ import {
   objectIdSchema,
   updateModelRequestSchema,
 } from '@futuria/shared';
+import { AllowAnonymous } from '../auth/allow-anonymous.decorator.js';
 import type { AuthContext } from '../auth/auth.types.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
+import { PlanGuard, RequiresFeature } from '../auth/plan.guard.js';
 import { SimulationsService } from './simulations.service.js';
 
 @Controller('simulations')
@@ -29,6 +41,7 @@ export class SimulationsController {
   }
 
   /** Claude analyzes a free-text decision: scope, safety, questions and proposed paths. */
+  @AllowAnonymous()
   @Post('intake')
   intake(
     @CurrentUser() auth: AuthContext,
@@ -37,11 +50,13 @@ export class SimulationsController {
     return this.simulations.intake(auth, body);
   }
 
+  @AllowAnonymous()
   @Get()
   list(@CurrentUser() auth: AuthContext): Promise<SimulationSummaryDto[]> {
     return this.simulations.list(auth);
   }
 
+  @AllowAnonymous()
   @Get(':id')
   get(
     @CurrentUser() auth: AuthContext,
@@ -50,6 +65,7 @@ export class SimulationsController {
     return this.simulations.get(auth, id);
   }
 
+  @AllowAnonymous()
   @Patch(':id/answers')
   saveAnswers(
     @CurrentUser() auth: AuthContext,
@@ -60,6 +76,7 @@ export class SimulationsController {
   }
 
   /** Claude builds the decision model from the intake answers (then clamped server-side). */
+  @AllowAnonymous()
   @Post(':id/model')
   @HttpCode(200)
   buildModel(
@@ -70,6 +87,7 @@ export class SimulationsController {
   }
 
   /** Replace the model with an edited one (assumptions review, sliders). */
+  @AllowAnonymous()
   @Patch(':id/model')
   updateModel(
     @CurrentUser() auth: AuthContext,
@@ -79,7 +97,10 @@ export class SimulationsController {
     return this.simulations.updateModel(auth, id, body.model);
   }
 
-  /** Queue the pipeline (engine + narrative). Poll GET /simulations/:id for progress. */
+  /**
+   * Queue the pipeline (engine + narrative). Poll GET /simulations/:id for progress. Uses one
+   * simulation run; runs after the first one ("Update the story") need a paid plan.
+   */
   @Post(':id/run')
   @HttpCode(202)
   run(
@@ -89,9 +110,11 @@ export class SimulationsController {
     return this.simulations.run(auth, id);
   }
 
-  /** Queue a story refresh from the existing engine results. */
+  /** Queue a story refresh from the existing engine results (paid plans; uses one run). */
   @Post(':id/renarrate')
   @HttpCode(202)
+  @UseGuards(PlanGuard)
+  @RequiresFeature('storyRefresh')
   renarrate(
     @CurrentUser() auth: AuthContext,
     @Param('id', { schema: objectIdSchema }) id: string,
@@ -99,6 +122,7 @@ export class SimulationsController {
     return this.simulations.renarrate(auth, id);
   }
 
+  @AllowAnonymous()
   @Delete(':id')
   @HttpCode(204)
   remove(

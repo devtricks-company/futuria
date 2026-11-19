@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import type { Profile, ProposedPath, SimulationDto } from '@futuria/shared';
+import type { PlanId, Profile, ProposedPath, SimulationDto } from '@futuria/shared';
 import { Notice } from '@/components/notice';
 import { Button } from '@/components/ui/button';
 import { PathsStep } from '@/components/wizard/paths-step';
@@ -27,11 +27,13 @@ export function IntakeSteps({
   simulation,
   profile,
   maxPaths,
+  plan,
   onCancel,
 }: {
   simulation: SimulationDto;
   profile: Profile | null;
   maxPaths: number;
+  plan: PlanId;
   /** Return to the assumptions without changing anything (when editing answers later). */
   onCancel?: () => void;
 }) {
@@ -140,6 +142,7 @@ export function IntakeSteps({
         <PathsStep
           paths={paths}
           maxPaths={maxPaths}
+          plan={plan}
           onChange={setPaths}
           onBack={questions.length > 0 ? () => setStep('questions') : undefined}
           onSubmit={() => build.mutate()}
