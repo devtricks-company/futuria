@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Logo } from '@/components/brand';
+import { SEO_PAGE_LIST } from '@/lib/seo-pages';
 
 export const DISCLAIMER =
   'FUTURIA shows simulated ranges, not predictions. It is not financial, legal or career advice. Check important decisions with a qualified professional.';
@@ -22,12 +23,16 @@ const COLUMNS = [
       { href: '/#faq', label: 'Questions' },
     ],
   },
-] as const;
+  {
+    title: 'Simulators',
+    links: SEO_PAGE_LIST.map((page) => ({ href: `/${page.slug}`, label: page.linkLabel })),
+  },
+];
 
 export function SiteFooter() {
   return (
     <footer className="mt-28 border-t border-border bg-surface/50">
-      <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr]">
+      <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div className="flex max-w-md flex-col gap-4">
           <Logo />
           <p className="font-display text-2xl leading-tight">

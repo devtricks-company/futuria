@@ -8,6 +8,7 @@ What exists so far:
 - **Phase 3:** the AI layer (intake, model, narrative) and the run pipeline (Inngest, or inline)
 - **Phase 4:** the web app: landing page, the `/new` wizard, results with sliders, dashboard and profile
 - **Phase 5:** accounts (Clerk), the signup gate, plan limits with an upgrade dialog, and Stripe billing
+- **Phase 6:** share links with social cards, the PDF report (Pro), PostHog funnel events, and search landing pages
 
 You can test in layers: automated tests, browser tests, the engine demo, the app in a browser, the API endpoints, and (with credentials) real Claude.
 
@@ -26,7 +27,7 @@ pnpm check
 Expected result:
 
 - every Turborepo task successful
-- passing tests: shared 25, engine 31, web 45, API unit 52, API e2e 42
+- passing tests: shared 27, engine 43, web 63, API unit 57, API e2e 52
 
 The API e2e tests use the server in `MONGODB_TEST_URI` (set it in `apps/api/.env` to run them on Atlas), or your local MongoDB if it's unset. Each test file creates a temporary `futuria_test_*` database and deletes it afterwards. Your `futuria` database is never touched. Local MongoDB is faster; on Atlas, expect the e2e step to take a few seconds longer.
 
@@ -105,9 +106,17 @@ rebuilds it with `NEXT_PUBLIC_CLERK_DISABLED=1` even when `.env.local` has keys.
 They start their own API (port 4100, fixture AI, inline pipeline, dev auth) and web app (port
 3100), so `pnpm dev` can keep running. The API uses a throwaway `futuria_test_web_e2e` database
 on `MONGODB_TEST_URI` or local MongoDB, dropped afterwards, and never reads `apps/api/.env`.
-Each test runs on a desktop and a phone viewport: Sara's full journey, profile pre-fill, the
-out-of-scope and crisis screens, and the Free plan's upgrade dialogs (paths, horizon, "Update the
-story", the billing page). CI runs them in the `web-e2e` job.
+Each test runs on a desktop and a phone viewport (28 in all). They cover:
+
+- Sara's full journey and profile pre-fill
+- the out-of-scope and crisis screens
+- the Free plan's upgrade dialogs: paths, horizon, "Update the story" and the billing page
+- sharing a simulation and opening the link signed out, with its social card
+- the PDF: an upgrade dialog on Free, then a real download on Pro
+- analytics staying off without a key
+- the search landing pages, the sitemap and `robots.txt`
+
+CI runs them in the `web-e2e` job.
 
 ## 7. Create and run a new simulation through the API (one command)
 
@@ -225,6 +234,106 @@ usage. To try a paid plan without Stripe, set `plan` on your user in the `users`
    To test a downgrade now, cancel the subscription immediately in the Stripe Dashboard: the
    webhook sets the plan back to Free and the limits block again.
 
+## 13. Sharing, PDF, analytics and search pages (Phase 6)
+
+### Share a simulation
+
+1. On a finished simulation, click **Share** and turn on **Public link**. The dialog shows exactly
+   what the page will show. **Copy** the link.
+2. Open it in a private window, signed out. You should see:
+   - the title, the futures chart and each path's chance of running out, with no amounts
+   - on Free, a "Made with FUTURIA" band
+3. Turn on **Show amounts and stories**, then reload: the amounts and the full results appear.
+4. **New link** replaces the address, and the old one shows "This link isn't shared anymore".
+   Turning **Public link** off does the same, immediately.
+5. The link's social card: add `/opengraph-image` to the share URL. The site card is at
+   http://localhost:3000/opengraph-image.
+
+### Link preview in a link debugger (Phase 6 ✅)
+
+A link debugger has to reach the page over the internet, so this uses a temporary tunnel. The
+script below runs a separate, throwaway copy of the app for it:
+
+- fixture AI, so it costs nothing
+- a `futuria_test_share_preview` database, dropped when you stop it, never your data
+- no Clerk: a Clerk development instance redirects visitors without cookies (link-preview bots
+  too) to its handshake, so the bot would never see the card. Production keys don't do this.
+- no analytics
+
+1. Install cloudflared once, then open a new terminal:
+   `winget install --id Cloudflare.cloudflared -e`
+2. In terminal 1, start the tunnel and copy the `https://<name>.trycloudflare.com` URL it prints:
+   `cloudflared tunnel --url http://localhost:3200`
+3. In terminal 2, build once and start the preview:
+   ```powershell
+   pnpm build
+   pnpm --filter @futuria/web share:preview https://<name>.trycloudflare.com
+   ```
+   The script rebuilds the web app for that URL and starts the API on :4200 and the web app on
+   :3200. It then shares Sara's simulation as a Free user and as a Pro user, checks both links
+   through the tunnel the way a bot sees them, and prints them.
+4. Paste each link into the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/)
+   or the [LinkedIn Post Inspector](https://www.linkedin.com/post-inspector/). Both need a login.
+   Posting the link in a private chat works too.
+   - **Free:** the card shows the title and the three futures with their chances, plus a "Made
+     with FUTURIA · free plan" band.
+   - **Pro:** the same card with no band. Cards never show amounts; this share's page does,
+     because the owner turned them on.
+5. Press Ctrl+C. The database is dropped and both servers stop. Then run
+   `pnpm --filter @futuria/web build` to get your normal build back.
+
+### PDF report (Pro)
+
+On Free, **Download PDF** on a results page opens the upgrade dialog. Upgrade with a test card
+(section 12), or set `plan: "pro"` on your user in the `users` collection. **Download PDF** then
+saves `futuria-<title>.pdf` with these sections:
+
+- the summary
+- the futures chart
+- what matters most
+- the realistic Time Machine
+- the action plan
+- the assumptions
+
+### PostHog funnel (Phase 6 ✅)
+
+1. Create a free PostHog project and copy its project API key (`phc_...`). In
+   `apps/web/.env.local` set `NEXT_PUBLIC_POSTHOG_KEY=phc_...` and `NEXT_PUBLIC_POSTHOG_REGION`
+   (`us` or `eu`, matching the project). Restart `pnpm dev`.
+2. Use Clerk keys (section 12), so `signed_up` fires, and Stripe test mode, so `upgraded` fires.
+3. In a private window, walk the whole funnel:
+
+   | Step                        | Event            |
+   | --------------------------- | ---------------- |
+   | Landing page                | `landing_viewed` |
+   | **Simulate my futures**     | `intake_started` |
+   | **See my 3 futures**        | `model_reviewed` |
+   | Sign up                     | `signed_up`      |
+   | The results page            | `results_viewed` |
+   | **Share** → **Public link** | `shared`         |
+   | Upgrade with card 4242      | `upgraded`       |
+
+4. In PostHog, **Activity** shows the events within a few seconds. Then go to **Product
+   analytics** → **New insight** → **Funnel** and add the seven events in that order. The funnel
+   shows your pass through every step.
+5. Check the privacy rules. No event URL contains `q=` (the decision text) or `session_id=`. No
+   event carries amounts, names or emails; the person is the Clerk user id.
+
+Events go through the app's own `/ingest` relay, so ad blockers don't drop them. Without a key,
+nothing is loaded and `/ingest` answers 404.
+
+### Search landing pages
+
+| URL                                                     | What you should see                                  |
+| ------------------------------------------------------- | ---------------------------------------------------- |
+| http://localhost:3000/should-i-quit-my-job-to-freelance | Sara's futures, a prefilled form, the FAQ            |
+| http://localhost:3000/freelance-runway-calculator       | The same, framed as how long savings last            |
+| http://localhost:3000/quit-job-to-start-a-startup       | Leo's futures: stay, bootstrap, or raise a round     |
+| http://localhost:3000/sitemap.xml                       | The landing page and the three pages above           |
+| http://localhost:3000/robots.txt                        | The app's private areas are blocked, `/share/` isn't |
+
+The prefilled form carries its decision into the wizard.
+
 ## Troubleshooting
 
 | Problem                                   | Fix                                                                                                             |
@@ -250,3 +359,8 @@ usage. To try a paid plan without Stripe, set `plan` on your user in the `users`
 | Plan doesn't change after paying          | `stripe:listen` isn't running or its `whsec_` doesn't match `STRIPE_WEBHOOK_SECRET`.                            |
 | `must specify events to forward`          | Plain `stripe listen` needs `--events`. Use `pnpm --filter @futuria/api stripe:listen`.                         |
 | API won't start: `requires ANTHROPIC_...` | `AI_MODE=anthropic` without a key. Add `ANTHROPIC_API_KEY` or remove `AI_MODE`.                                 |
+| Link debugger: no image, or a 307         | Clerk development keys redirect bots. Use `share:preview` (section 13).                                         |
+| Card's og:image points at localhost       | `NEXT_PUBLIC_SITE_URL` is read at build time. Rebuild with the public URL (`share:preview` does).               |
+| `share:preview`: "not reachable"          | The tunnel isn't running, or it doesn't point at `http://localhost:3200`.                                       |
+| No events in PostHog                      | Key or region missing or wrong in `apps/web/.env.local`. They're read at startup and build: restart `pnpm dev`. |
+| **Download PDF** opens the upgrade dialog | The PDF is a Pro feature. Upgrade (section 12) or set `plan` on your user.                                      |

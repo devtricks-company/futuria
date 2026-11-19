@@ -14,7 +14,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BUSY_STATUSES,
   type FullAnalysis,
@@ -41,6 +41,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Segmented, SegmentedItem } from '@/components/ui/toggle-group';
 import { NotFound } from '@/components/wizard/wizard';
 import { useEngine } from '@/engine/use-engine';
+import { track } from '@/lib/analytics';
 import { ApiError, api, errorMessage, queryKeys } from '@/lib/api';
 import { openGate } from '@/lib/gate-events';
 import { useNavigate } from '@/lib/navigation';
@@ -152,7 +153,10 @@ function Results({ simulation }: { simulation: SimulationDto }) {
   // A plan error from the server opens the same dialog (MutationCache).
   const report = useMutation({
     mutationFn: () => fetchReport(simulation.id),
-    onSuccess: (blob) => saveFile(blob, reportFileName(simulation.title)),
+    onSuccess: (blob) => {
+      saveFile(blob, reportFileName(simulation.title));
+      track('pdf_exported', { paths: stored?.result.paths.length });
+    },
   });
   const pdfPlan = me.data ? pdfUpgrade(me.data.plan) : null;
   const downloadReport = () =>
@@ -166,6 +170,17 @@ function Results({ simulation }: { simulation: SimulationDto }) {
     },
   });
   const [confirmEdit, setConfirmEdit] = useState(false);
+
+  // Funnel step: finished results on screen (once per visit to this simulation).
+  const viewed = useRef(false);
+  useEffect(() => {
+    if (viewed.current || simulation.status !== 'ready' || !stored) return;
+    viewed.current = true;
+    track('results_viewed', {
+      paths: stored.result.paths.length,
+      horizonMonths: stored.result.horizonMonths,
+    });
+  }, [simulation.status, stored]);
 
   // A fresh run from the wizard: nothing to show until the engine step is done.
   if (!result || !model) {

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Input, Label } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { track } from '@/lib/analytics';
 import { api, errorMessage, queryKeys } from '@/lib/api';
 import { openGate } from '@/lib/gate-events';
 import { watermarkUpgrade } from '@/lib/plan-gates';
@@ -67,6 +68,10 @@ function ShareDialogContent({
   const share = useMutation({
     mutationFn: (body: ShareRequest) => api.share(simulation.id, body),
     onSuccess: (settings) => {
+      // Funnel step: a simulation goes public (not every later change of its settings).
+      if (settings.isPublic && !simulation.share.isPublic) {
+        track('shared', { showNumbers: settings.showNumbers });
+      }
       queryClient.setQueryData<SimulationDto>(queryKeys.simulation(simulation.id), (current) =>
         current ? { ...current, share: settings } : current,
       );
@@ -196,6 +201,7 @@ function ShareLink({
   }, [copied]);
 
   const copy = async () => {
+    track('share_link_copied');
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

@@ -2,6 +2,7 @@ import { ArrowRight, CalendarRange, EyeOff, GitBranch } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { PublicShareDto, SharedPathDto } from '@futuria/shared';
+import { TrackView } from '@/components/analytics/track-view';
 import { LogoMark } from '@/components/brand';
 import { FuturesChart } from '@/components/landing/futures-chart';
 import { Notice } from '@/components/notice';
@@ -26,6 +27,14 @@ export function ShareView({ share }: { share: PublicShareDto }) {
 
   return (
     <article className="flex flex-col gap-8">
+      <TrackView
+        event="share_viewed"
+        properties={{
+          watermark: share.watermark,
+          showNumbers: share.showNumbers,
+          paths: share.paths.length,
+        }}
+      />
       {share.watermark ? <Watermark /> : null}
 
       <header className="flex flex-col gap-3">

@@ -182,14 +182,23 @@ function PathLine({
   );
 }
 
-/** Free plan: a band no one can miss, which is also an invitation. */
+/** Characters of a site address that fit the band's right side at the full 24 px. */
+const BAND_HOST_CHARS = 46;
+
+/**
+ * Free plan: a band no one can miss, which is also an invitation. The plan label never wraps,
+ * and the site address never breaks at its hyphens: a long address (a tunnel's, say) moves to a
+ * second line on the right, and one longer still gets a smaller font.
+ */
 function Watermark({ host }: { host: string }) {
+  const hostSize = Math.max(14, Math.min(24, Math.floor((24 * BAND_HOST_CHARS) / host.length)));
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 24,
         marginTop: 24,
         padding: '14px 24px',
         borderRadius: 18,
@@ -197,10 +206,22 @@ function Watermark({ host }: { host: string }) {
         color: C.onBrand,
         fontSize: 24,
         fontWeight: 700,
+        lineHeight: 1.25,
       }}
     >
-      <span>Made with FUTURIA · free plan</span>
-      <span>{`Simulate yours at ${host}`}</span>
+      <span style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>Made with FUTURIA · free plan</span>
+      <div
+        style={{
+          display: 'flex',
+          flex: 1,
+          minWidth: 0,
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+        }}
+      >
+        <span style={{ whiteSpace: 'nowrap' }}>Simulate yours at</span>
+        <span style={{ whiteSpace: 'nowrap', marginLeft: 4, fontSize: hostSize }}>{host}</span>
+      </div>
     </div>
   );
 }

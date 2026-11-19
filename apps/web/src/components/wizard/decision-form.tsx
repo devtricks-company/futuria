@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label, Textarea } from '@/components/ui/input';
 import { INTAKE_MESSAGES, Working } from '@/components/wizard/working';
+import { track } from '@/lib/analytics';
 import { api, errorMessage, queryKeys } from '@/lib/api';
 import { EXAMPLE_DECISIONS } from '@/lib/examples';
 import { openGate } from '@/lib/gate-events';
@@ -54,7 +55,10 @@ export function DecisionForm() {
       className="flex flex-col gap-6"
       onSubmit={(event) => {
         event.preventDefault();
-        if (trimmed.length >= MIN) intake.mutate(trimmed);
+        if (trimmed.length < MIN) return;
+        // Funnel step 2. Never the text itself: only that a decision was submitted.
+        track('intake_started', { fromLanding: params.has('q') });
+        intake.mutate(trimmed);
       }}
     >
       {outOfRuns ? (

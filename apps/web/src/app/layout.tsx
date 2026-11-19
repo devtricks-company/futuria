@@ -2,6 +2,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import type { ReactNode } from 'react';
+import { AnalyticsIdentity } from '@/components/analytics/analytics-identity';
 import { Providers } from '@/components/providers';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
@@ -71,6 +72,8 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         </a>
         <Auth>
           <Providers>
+            {/* Needs ClerkProvider, so only with Clerk on. */}
+            {clerkEnabled ? <AnalyticsIdentity /> : null}
             <SiteHeader />
             <div id="main" className="flex flex-1 flex-col">
               {children}
