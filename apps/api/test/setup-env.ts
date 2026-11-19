@@ -30,3 +30,5 @@ process.env.AUTH_MODE = 'dev';
 process.env.AI_MODE = 'fixture';
 process.env.PIPELINE_MODE = 'inline';
 process.env.INNGEST_DEV = '0';
+// No Stripe unless a spec opts in (billing.e2e-spec.ts swaps in a fake Stripe client).
+process.env.BILLING_MODE = 'disabled';

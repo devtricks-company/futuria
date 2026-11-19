@@ -38,7 +38,9 @@ import { Segmented, SegmentedItem } from '@/components/ui/toggle-group';
 import { NotFound } from '@/components/wizard/wizard';
 import { useEngine } from '@/engine/use-engine';
 import { ApiError, api, errorMessage, queryKeys } from '@/lib/api';
+import { openGate } from '@/lib/gate-events';
 import { useNavigate } from '@/lib/navigation';
+import { storyUpgrade, upgradeFromError } from '@/lib/plan-gates';
 import { type TweakValues, activeTweaks, applyTweaks, slidersFor } from '@/lib/tweaks';
 import { cn } from '@/lib/utils';
 
@@ -147,6 +149,15 @@ function Results({ simulation }: { simulation: SimulationDto }) {
     },
   });
 
+  // On Free a finished simulation keeps its results: a new story (or new assumptions, which
+  // need one) is a paid feature. The sliders stay free either way.
+  const me = useQuery({ queryKey: queryKeys.me, queryFn: api.me });
+  const storyPlan = me.data && stored ? storyUpgrade(me.data.plan) : null;
+  const upgradeForStory = storyPlan
+    ? () => openGate({ kind: 'upgrade', reason: 'story', plan: storyPlan })
+    : null;
+  const updateStory = () => (upgradeForStory ? upgradeForStory() : rerun.mutate('tweaks'));
+
   const editAll = useMutation({
     mutationFn: () => api.updateModel(simulation.id, model!),
     onSuccess: (updated) => {
@@ -225,7 +236,7 @@ function Results({ simulation }: { simulation: SimulationDto }) {
       after={result.paths}
       onChange={(sliderId, v) => setValues((current) => ({ ...current, [sliderId]: v }))}
       onReset={() => setValues({})}
-      onUpdateStory={() => rerun.mutate('tweaks')}
+      onUpdateStory={updateStory}
     />
   );
 
@@ -284,7 +295,7 @@ function Results({ simulation }: { simulation: SimulationDto }) {
           title="You're exploring tweaked numbers"
           action={
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => rerun.mutate('tweaks')} disabled={rerun.isPending}>
+              <Button size="sm" onClick={updateStory} disabled={rerun.isPending}>
                 Update the story
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setValues({})}>
@@ -296,7 +307,8 @@ function Results({ simulation }: { simulation: SimulationDto }) {
           The story and the action plan text still describe your original assumptions.
         </Notice>
       ) : null}
-      {rerun.isError ? (
+      {/* Plan errors open the upgrade dialog instead. */}
+      {rerun.isError && !upgradeFromError(rerun.error) ? (
         <Notice variant="error" title="We couldn't start a new run">
           {errorMessage(rerun.error)}
         </Notice>
@@ -471,7 +483,11 @@ function Results({ simulation }: { simulation: SimulationDto }) {
               a new story). To explore without losing them, use the sliders.
             </Notice>
           ) : (
-            <Button variant="secondary" onClick={() => setConfirmEdit(true)} disabled={busy}>
+            <Button
+              variant="secondary"
+              onClick={() => (upgradeForStory ? upgradeForStory() : setConfirmEdit(true))}
+              disabled={busy}
+            >
               <Pencil />
               Edit all assumptions
             </Button>

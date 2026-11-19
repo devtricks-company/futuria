@@ -7,6 +7,7 @@ What exists so far:
 - **Phase 2:** the NestJS API on the `futuria` database in your MongoDB Atlas cluster
 - **Phase 3:** the AI layer (intake, model, narrative) and the run pipeline (Inngest, or inline)
 - **Phase 4:** the web app: landing page, the `/new` wizard, results with sliders, dashboard and profile
+- **Phase 5:** accounts (Clerk), the signup gate, plan limits with an upgrade dialog, and Stripe billing
 
 You can test in layers: automated tests, browser tests, the engine demo, the app in a browser, the API endpoints, and (with credentials) real Claude.
 
@@ -25,11 +26,11 @@ pnpm check
 Expected result:
 
 - every Turborepo task successful
-- passing tests: shared 18, engine 31, web 23, API unit 46, API e2e 22
+- passing tests: shared 25, engine 31, web 45, API unit 52, API e2e 42
 
 The API e2e tests use the server in `MONGODB_TEST_URI` (set it in `apps/api/.env` to run them on Atlas), or your local MongoDB if it's unset. Each test file creates a temporary `futuria_test_*` database and deletes it afterwards. Your `futuria` database is never touched. Local MongoDB is faster; on Atlas, expect the e2e step to take a few seconds longer.
 
-The e2e tests always use fixture AI and the inline pipeline, even if your `.env` has Claude or Inngest settings. One red `ERROR ... Inline run ... failed` line in the output is expected: a test checks that a failing run is reported correctly.
+The e2e tests always use fixture AI and the inline pipeline, even if your `.env` has Claude or Inngest settings. Two red lines in the output are expected, `ERROR ... Inline run ... failed` and `ERROR ... Could not queue run`: tests check that a failing run and a queue outage are reported (and refunded) correctly.
 
 ## 2. See the engine work (no servers needed)
 
@@ -63,7 +64,8 @@ This starts the web app on http://localhost:3000, the API on http://localhost:40
 | http://localhost:4000/simulations        | "Sample: Sara quits to freelance"                                    |
 | http://localhost:4000/simulations/`<id>` | The full stored results (copy the id from the list)                  |
 
-The browser counts as `dev-user` because the API runs in dev auth mode until Clerk keys are added.
+The browser counts as `dev-user` while the API runs in dev auth mode (no Clerk keys). With Clerk
+set up, see section 12.
 
 ## 5. Walk Sara's journey in the browser
 
@@ -91,15 +93,21 @@ stand-ins.
 
 ```powershell
 pnpm build                                                     # the tests run the production builds
+pnpm --filter @futuria/web build:e2e                           # only if apps/web/.env.local has Clerk keys
 pnpm --filter @futuria/web exec playwright install chromium    # once
 pnpm --filter @futuria/web test:e2e
 ```
 
+The tests use the API's dev identity, so the web app must be built **without** Clerk. `build:e2e`
+rebuilds it with `NEXT_PUBLIC_CLERK_DISABLED=1` even when `.env.local` has keys. Run
+`pnpm --filter @futuria/web build` afterwards to get a Clerk build back.
+
 They start their own API (port 4100, fixture AI, inline pipeline, dev auth) and web app (port
 3100), so `pnpm dev` can keep running. The API uses a throwaway `futuria_test_web_e2e` database
 on `MONGODB_TEST_URI` or local MongoDB, dropped afterwards, and never reads `apps/api/.env`.
-Each test runs on a desktop and a phone viewport: Sara's full journey, profile pre-fill, and the
-out-of-scope and crisis screens. CI runs them in the `web-e2e` job.
+Each test runs on a desktop and a phone viewport: Sara's full journey, profile pre-fill, the
+out-of-scope and crisis screens, and the Free plan's upgrade dialogs (paths, horizon, "Update the
+story", the billing page). CI runs them in the `web-e2e` job.
 
 ## 7. Create and run a new simulation through the API (one command)
 
@@ -124,8 +132,9 @@ The script walks Sara's journey through every endpoint, in order:
 Options:
 
 - `--cleanup` deletes the new simulation at the end.
-- `--renarrate` also refreshes the story (`POST /renarrate`).
-- `--user alice` acts as a different dev user.
+- `--renarrate` checks the story refresh: a paid feature, so on Free it expects `403 plan_feature`.
+- `--user alice` acts as a given dev user. By default every run is a new user (`smoke-<time>`) on
+  the Free plan, so repeated runs never hit its 3-simulation limit.
 
 With `"ai":"anthropic"` the script makes real Claude calls: one full simulation, about $0.35–0.45. The intake and model steps take up to a minute each, and the run up to a couple of minutes.
 
@@ -170,6 +179,52 @@ If a run stays `queued`, the Dev Server isn't running or can't reach the API.
    - `users`: one document per dev user, e.g. `dev:dev-user` on the `free` plan.
    - `simulations`: the sample, plus anything you created. Each stores `model`, `seed` and the full `analysis`.
 
+## 12. Accounts, plan limits and billing (Phase 5)
+
+### Sign-up and the signup gate (Clerk dev keys)
+
+1. `apps/web/.env.local`: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`,
+   `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`.
+2. `apps/api/.env`: the same `CLERK_SECRET_KEY`, and **remove `AUTH_MODE=dev`** (it overrides the
+   key). `GET /health` doesn't show the auth mode; the API logs a warning at startup in dev mode.
+3. `pnpm dev`, then in a private window: landing page → wizard → assumptions. The button reads
+   **See my 3 futures**. Clicking it saves your edits and opens the signup gate.
+4. Sign up. You come back to `/new/<id>?run=1`, the draft moves to your account (the anonymous
+   cookie `futuria_anon` is dropped), and the run starts by itself.
+5. `/dashboard` lists it. `/dashboard` and `/settings/*` now require sign-in.
+
+A signed-out visitor can make up to 3 drafts; they expire after 14 days unless claimed.
+
+### Plan limits (no Stripe needed)
+
+On Free, check that each of these opens the upgrade dialog instead of failing:
+
+- a 4th simulation (the `/new` page says so before Claude reads the decision)
+- a 24-, 36- or 60-month horizon (locked options in the assumptions review)
+- a 4th path (the paths step)
+- "Update the story" or "Edit all assumptions" on a finished simulation (sliders stay free)
+
+Without Stripe keys the dialog says payments aren't set up. `/settings/billing` shows the plan and
+usage. To try a paid plan without Stripe, set `plan` on your user in the `users` collection.
+
+### Stripe test mode
+
+1. Create a Stripe account (test mode is enough) and install the Stripe CLI
+   (`winget install --id Stripe.StripeCli -e`, then open a new terminal); run `stripe login`.
+2. `apps/api/.env`: `STRIPE_SECRET_KEY=sk_test_...`.
+3. `pnpm --filter @futuria/api stripe:setup`: creates Pro and Premium with monthly and yearly
+   prices (lookup keys `futuria_<plan>_<month|year>`) and the Customer Portal settings. Safe to run
+   again; a changed price gets a new Stripe price and the old one is archived.
+4. `pnpm --filter @futuria/api stripe:listen` (it runs `stripe listen` with the events the API
+   handles; Stripe CLI 1.55+ refuses to listen without an event list) and put the `whsec_...` it prints
+   in `STRIPE_WEBHOOK_SECRET`. Restart the API: `GET /health` shows `"billing":"stripe"`.
+5. Upgrade from the dialog or `/settings/billing` with card `4242 4242 4242 4242` (any future date,
+   any CVC). Back on `/settings/billing` the plan is Pro (synced right away, and again by the
+   webhook), the usage meter resets, and 24-month horizons and story updates unlock.
+6. **Manage billing** opens the Customer Portal (switch plans, cancel at period end, invoices).
+   To test a downgrade now, cancel the subscription immediately in the Stripe Dashboard: the
+   webhook sets the plan back to Free and the limits block again.
+
 ## Troubleshooting
 
 | Problem                                   | Fix                                                                                                             |
@@ -188,4 +243,10 @@ If a run stays `queued`, the Dev Server isn't running or can't reach the API.
 | Engine or shared changes not picked up    | Under `pnpm dev` the watchers rebuild them. Otherwise run `pnpm build`.                                         |
 | Run stuck in `queued`                     | `PIPELINE_MODE=inngest` without the Dev Server running. Start it (section 7) or remove `INNGEST_DEV`.           |
 | `ai_misconfigured` (502) on intake        | Claude rejected the key, URL, model or a feature. Run `ai:probe` and apply the switches it suggests.            |
+| Browser tests stuck on sign-in pages      | The web build has Clerk keys. Run `pnpm --filter @futuria/web build:e2e` before `test:e2e`.                     |
+| Signed in, but the API acts as `dev-user` | `apps/api/.env` still has `AUTH_MODE=dev`. Remove it so the API verifies Clerk tokens.                          |
+| Checkout: 503 `billing_disabled`          | No `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` in `apps/api/.env`. See section 12.                              |
+| Checkout: 503 `billing_misconfigured`     | The Stripe prices don't exist yet. Run `pnpm --filter @futuria/api stripe:setup`.                               |
+| Plan doesn't change after paying          | `stripe:listen` isn't running or its `whsec_` doesn't match `STRIPE_WEBHOOK_SECRET`.                            |
+| `must specify events to forward`          | Plain `stripe listen` needs `--events`. Use `pnpm --filter @futuria/api stripe:listen`.                         |
 | API won't start: `requires ANTHROPIC_...` | `AI_MODE=anthropic` without a key. Add `ANTHROPIC_API_KEY` or remove `AI_MODE`.                                 |

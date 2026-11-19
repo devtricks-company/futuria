@@ -4,14 +4,15 @@ _Explore the Future Before You Live It._
 
 ## Progress
 
-| Phase                | Status                                                                                                     |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- |
-| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                     |
-| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms         |
-| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)    |
-| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open  |
-| 4. Web app MVP       | 🟡 Built (2026-11-17): Playwright journey green on desktop + mobile (fixture). Manual real-Claude run open |
-| 5–11                 | Not started                                                                                                |
+| Phase                | Status                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| 0. Foundations       | ✅ Done (2026-11-16). Hosted deploys pending accounts.                                                    |
+| 1. Simulation engine | ✅ Done (2026-11-16): 31 engine + 6 schema tests green, 3 paths × 1,000 runs × 24 months in ~43 ms        |
+| 2. API core and data | ✅ Done (2026-11-16): local MongoDB `futuria` database, dev auth until Clerk keys are added (see notes)   |
+| 3. AI layer          | ✅ Done (2026-11-17): real Claude via the gateway, full eval 30/30, $0.367 per simulation. Pro quota open |
+| 4. Web app MVP       | ✅ Done (2026-11-19): Playwright journey green on desktop + mobile (fixture), manual real-Claude run OK   |
+| 5. Accounts, billing | ✅ Done (2026-11-19): Clerk sign-up, test-card upgrades, plan changes via the Stripe CLI webhook          |
+| 6–11                 | Not started                                                                                               |
 
 **Phase 2 notes (deviations from the plan below):**
 
@@ -57,7 +58,7 @@ _Explore the Future Before You Live It._
   - `pnpm check` (web unit tests included)
   - Playwright (`pnpm --filter @futuria/web test:e2e`): Sara's journey, profile pre-fill, out-of-scope and crisis routing, each on desktop and a Pixel 7 viewport, against the built API in fixture mode
   - a screenshot pass in light and dark
-- **Open for ✅:** a manual run with real Claude on a phone and a desktop (your part; about $0.40 per run, plus about $0.25 per "Update the story").
+- **Manual ✅ check (2026-11-19):** a run with real Claude on a phone and a desktop went well (about $0.40 per run, plus about $0.25 per "Update the story").
 - **Deviations from the plan above:**
   - **API access goes through a same-origin proxy** (`app/api/backend/[...path]`, endpoint allowlist). The browser never holds the API URL or a token. It adds the Clerk token, or the dev identity in `AUTH_MODE=dev`.
   - **"Update the story" runs the simulation again** (`PATCH /model` with the tweaks, then `POST /run`) instead of calling `/renarrate`, which reuses the stored numbers and would describe the old future. The cost is the same as a story refresh.
@@ -67,6 +68,56 @@ _Explore the Future Before You Live It._
   - **Clerk is optional in the web app.** Without a publishable key it runs without sign-in (CI, e2e), which keeps Phase 5's signup gate separate.
   - **Shared code:** `FIELD_META` (units and bounds) is now shared by the API clamps and the web inputs. `milestoneMonths` moved to `@futuria/shared`.
 - **Found while testing:** Clerk's `router.refresh()` when its script loads can swallow a pending `router.push`, which could leave the wizard spinning after a fast step. Navigations after mutations go through `useNavigate()` (`lib/navigation.ts`), which falls back to a full page load if the page didn't change.
+
+**Phase 5 status and notes (2026-11-18):**
+
+- **Pricing decided** (from the Phase 3 cost of $0.367 per simulation):
+  - **Pro:** $19/mo or $190/yr, 20 simulations a month. Full use costs about $7.30 in AI, about 39% of revenue.
+  - **Premium:** $49/mo or $490/yr, 60 simulations a month. Full use costs about $22, about 45%.
+  - Yearly prices are 10× monthly, so two months are free.
+  - **Every run counts:** a first run, "Update the story" and a story refresh each use one simulation.
+  - Re-runs are Pro and up only. On Free a finished simulation keeps its results; the sliders stay free.
+- **Built:**
+  - **Signup gate (journey step 5).**
+    - A signed-out visitor is an anonymous user, identified by an httpOnly cookie that the proxy sends as `x-anon-id`.
+    - Anonymous users can reach the wizard up to the run, with at most 3 drafts. Drafts expire after 14 days (TTL index).
+    - "See my N futures" saves the edits, then opens the gate.
+    - After sign-up, the first signed-in call claims the drafts and the run starts by itself (`?run=1`).
+  - **Quotas.**
+    - `UsageService.consume` is an atomic conditional `$inc` on every run.
+    - Monthly windows roll from `usage.periodStart`, and Stripe renewals re-anchor them.
+    - Failed runs and queue failures are refunded.
+    - Intake and model building check the quota first, so no AI is spent on a decision that can't run.
+  - **Plan errors and the gate UI.**
+    - `PlanGuard` with `@RequiresFeature` gates routes by plan feature.
+    - Plan errors carry `requiredPlan`.
+    - A single upgrade dialog opens from locked controls (horizon, paths, story update, the `/new` quota banner) and from any mutation that fails with a plan error.
+  - **Stripe.**
+    - `POST /billing/checkout`, `/billing/portal`, `/billing/sync` (right after Checkout) and `/billing/webhook` (signature checked against the raw body).
+    - The sync always re-reads subscriptions from Stripe; a new billing period resets the quota once.
+    - `stripe:setup` creates the products, prices (by lookup key) and the portal configuration.
+  - **Web.**
+    - `/settings/billing`: plan, usage meter, Manage billing, and upgrade cards with a monthly/yearly switch.
+    - Real CTAs on the landing pricing.
+    - `/dashboard` and `/settings` require sign-in with Clerk.
+- **Verified:**
+  - `pnpm check` passes: shared 25, engine 31, web 45, API unit 52, API e2e 42.
+  - The new API e2e specs cover:
+    - anonymous drafts and claiming
+    - quotas, rollover, concurrency and refunds
+    - billing with a fake Stripe client and real webhook signatures
+  - Playwright passes twice in a row on desktop and mobile, including the new upgrade-dialog journey.
+- **✅ checks, done by hand (2026-11-19):**
+  - **Clerk:** the API runs in Clerk mode with the dev keys. Real Clerk accounts signed up and ran simulations.
+  - **Stripe test mode:** `stripe:setup` created the four prices and the portal configuration. Two accounts upgraded to Pro through Checkout with card 4242, and their quotas restarted at the Stripe period start.
+  - **Plan via the webhook:** with `stripe:listen` running, a subscription was switched Pro → Premium → Pro through the Stripe API only (no `/billing/sync`, no proration). Both `customer.subscription.updated` events returned 200, the user's plan followed within about 3 s, and the usage count was unchanged.
+  - **Limits:** `pnpm turbo run lint typecheck test --force` and Playwright (10/10, including the upgrade dialog on desktop and mobile) passed on the same code.
+- **Deviations and findings:**
+  - **Changing a finished simulation on Free is refused.** "Update the story" saved the model (clearing the stored results) before running, so on Free the results would have been lost behind a refused run.
+  - **E2E builds must not have Clerk.** `apps/web/.env.local` has Clerk keys now, so `pnpm build` produces a Clerk app that the dev-identity tests can't sign in to. Use `pnpm --filter @futuria/web build:e2e` (it sets `NEXT_PUBLIC_CLERK_DISABLED=1`).
+  - **Fixed a phone layout bug from the UI redesign.** The drifting background glow scaled past the screen edge, widening the page by up to about 12 px on phones. That made taps miss (flaky mobile e2e) and let the page wobble sideways. Its container now clips.
+  - **The smoke script runs as a new Free user each time,** so it never hits the 3-simulation limit.
+  - **Business isn't sold yet** (Phase 10). A full Premium quota just waits for the next period.
 
 ## Context
 
@@ -238,7 +289,8 @@ Settings: 3 retries, concurrency of 2 per user, global throttle. Inngest is moun
 ### 3. Data model (MongoDB via `@nestjs/mongoose`)
 
 - **`users`**
-  - `clerkId`, `email`, `plan`, `stripeCustomerId`
+  - `externalId` (Clerk id, `dev:<name>` or `anon:<uuid>`), `anonymous`, `expiresAt` (TTL, anonymous only)
+  - `email`, `plan`, `stripeCustomerId`, `subscription {id, status, priceLookupKey, interval, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd}`
   - `usage {periodStart, simulationsUsed}`
   - `baseline {currency, netIncome, expenses, savings, dependents, country, riskTolerance}`, reused on the next simulation
 - **`simulations`**
@@ -269,12 +321,14 @@ Cross-cutting concerns:
 
 ### 5. Plans and limits (`packages/shared/src/plans.ts`)
 
-| Plan     | Price  | Simulations                         | Horizon | Paths | Extras                                                                        |
-| -------- | ------ | ----------------------------------- | ------- | ----- | ----------------------------------------------------------------------------- |
-| Free     | $0     | 3 total                             | 12 mo   | 3     | Watermarked share                                                             |
-| Pro      | $12/mo | 20/mo (tune after cost measurement) | 24 mo   | 5     | PDF export, story refresh, Reality Check, Ask the Future                      |
-| Premium  | $29/mo | 60/mo                               | 60 mo   | 5     | Taxes / inflation / advanced variables, multiple profiles, all Decision Packs |
-| Business | $99/mo | 200/mo pooled                       | 60 mo   | 8     | Team workspace, business packs, branded reports, API                          |
+| Plan     | Price                | Simulations   | Horizon | Paths | Extras                                                                        |
+| -------- | -------------------- | ------------- | ------- | ----- | ----------------------------------------------------------------------------- |
+| Free     | $0                   | 3 total       | 12 mo   | 3     | Watermarked share                                                             |
+| Pro      | $19/mo or $190/yr    | 20/mo         | 24 mo   | 5     | PDF export, story refresh, Reality Check, Ask the Future                      |
+| Premium  | $49/mo or $490/yr    | 60/mo         | 60 mo   | 5     | Taxes / inflation / advanced variables, multiple profiles, all Decision Packs |
+| Business | $99/mo (not sold v1) | 200/mo pooled | 60 mo   | 8     | Team workspace, business packs, branded reports, API                          |
+
+Every run uses one simulation: a first run, "Update the story" and a story refresh. Re-runs need Pro or above.
 
 ---
 
@@ -360,7 +414,7 @@ Cross-cutting concerns:
 3. `PlanGuard` limits and an upgrade modal at each gate.
 4. Stripe products for Pro and Premium (monthly and yearly), Checkout, Customer Portal, and a webhook that syncs the plan to the user.
 
-✅ Done when you can upgrade with a test card and the plan updates via the webhook (Stripe CLI `stripe listen`), and limits block and unblock correctly.
+✅ Done when you can upgrade with a test card and the plan updates via the webhook (Stripe CLI, `pnpm --filter @futuria/api stripe:listen`), and limits block and unblock correctly.
 
 **Phase 6: Share and growth loop (week 6)**
 
@@ -430,7 +484,7 @@ Cross-cutting concerns:
 | AI quality | `pnpm eval --yes`: 30 personas checked for schema, ranges, routing and grounding. Real API, run manually.                |
 | Pipeline   | Inngest Dev Server (`npx inngest-cli@latest dev`): watch `simulation-run` steps, retries and failures                    |
 | Web        | `pnpm --filter web test:e2e`: Playwright test of Sara's full journey in fixture mode, on desktop and mobile viewports    |
-| Billing    | Stripe test mode, `stripe listen --forward-to localhost:<api>/billing/webhook`, test cards                               |
+| Billing    | Stripe test mode, `pnpm --filter @futuria/api stripe:listen` (forwards webhooks to the local API), test cards            |
 | Production | Staging deploy, then a full manual journey with real Claude, a Sentry error check, and a PostHog funnel check            |
 
 CI runs everything except the real-API evals on every push.

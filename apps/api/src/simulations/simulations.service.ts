@@ -32,13 +32,18 @@ import { assembleModel } from '../ai/clamps.js';
 import { normalizeIntake } from '../ai/normalize.js';
 import { PROMPT_SET_VERSION } from '../ai/prompts/index.js';
 import type { AuthContext } from '../auth/auth.types.js';
+import { anonymousDraftLimit, planFeatureRequired } from '../common/plan-errors.js';
 import { PipelineDispatcher } from '../pipeline/pipeline.dispatcher.js';
 import type { RunJob } from '../pipeline/pipeline.types.js';
+import { UsageService } from '../users/usage.service.js';
+import { anonymousExpiry } from '../users/users.service.js';
 import { assertModelWithinPlan } from './plan-limits.js';
 import { toSimulationDto, toSimulationSummaryDto } from './simulation.mapper.js';
 import { Simulation } from './simulation.schema.js';
 
 const LIST_LIMIT = 100;
+/** Drafts a signed-out visitor can make before the signup gate. */
+export const ANONYMOUS_DRAFT_LIMIT = 3;
 /** Horizon of AI-built models; people can change it when they edit the model. */
 const DEFAULT_HORIZON_MONTHS = 12;
 
@@ -79,13 +84,55 @@ export class SimulationsService {
     @InjectModel(Simulation.name) private readonly simulations: Model<Simulation>,
     @Inject(AI_PROVIDER) private readonly ai: AiProvider,
     private readonly dispatcher: PipelineDispatcher,
+    private readonly usage: UsageService,
   ) {}
+
+  /** Owner fields for a new simulation; an anonymous visitor's drafts expire unless claimed. */
+  private ownership(auth: AuthContext) {
+    return {
+      userId: new Types.ObjectId(auth.userId),
+      expiresAt: auth.anonymous ? anonymousExpiry() : null,
+    };
+  }
+
+  /**
+   * A simulation that already finished can only change (new answers, a new model, another run)
+   * on plans with story refresh. Free keeps its results and the free, local sliders.
+   */
+  private assertCanChangeFinished(auth: AuthContext, completedRuns: number | undefined): void {
+    if ((completedRuns ?? 0) > 0 && !PLANS[auth.plan].features.storyRefresh) {
+      throw planFeatureRequired('storyRefresh', auth.plan);
+    }
+  }
+
+  /** Load the finished-run count (404 if not owned) and check the simulation may change. */
+  private async assertChangeable(auth: AuthContext, id: string): Promise<void> {
+    const doc = await this.simulations
+      .findOne(this.owned(auth, id))
+      .select({ completedRuns: 1 })
+      .lean()
+      .exec();
+    if (!doc) throw notFound();
+    this.assertCanChangeFinished(auth, doc.completedRuns);
+  }
+
+  /**
+   * Before spending AI on new work: anonymous visitors get a few drafts, signed-in users need a
+   * simulation run left (otherwise they couldn't run what Claude prepares).
+   */
+  private async assertCanStartWork(auth: AuthContext): Promise<void> {
+    if (!auth.anonymous) return this.usage.assertCanStart(auth.userId);
+    const drafts = await this.simulations
+      .countDocuments({ userId: new Types.ObjectId(auth.userId) })
+      .exec();
+    if (drafts >= ANONYMOUS_DRAFT_LIMIT) throw anonymousDraftLimit();
+  }
 
   /** Create a simulation directly (optionally with a hand-written model), skipping the AI intake. */
   async create(auth: AuthContext, request: CreateSimulationRequest): Promise<SimulationDto> {
     if (request.model) assertModelWithinPlan(request.model, auth.plan);
     const doc = await this.simulations.create({
-      userId: new Types.ObjectId(auth.userId),
+      ...this.ownership(auth),
       title: request.title ?? deriveTitle(request.decisionText),
       decisionText: request.decisionText,
       status: request.model ? 'model_ready' : 'draft',
@@ -101,6 +148,7 @@ export class SimulationsService {
    * routing recorded (waitlist demand data / support screen) and go no further.
    */
   async intake(auth: AuthContext, request: IntakeRequest): Promise<SimulationDto> {
+    await this.assertCanStartWork(auth);
     const { output, usage } = await this.callAi(() =>
       this.ai.analyzeIntake({ decisionText: request.decisionText }),
     );
@@ -109,7 +157,7 @@ export class SimulationsService {
     const intake: SimulationIntake = { result, routing, answers: null, paths: null };
 
     const doc = await this.simulations.create({
-      userId: new Types.ObjectId(auth.userId),
+      ...this.ownership(auth),
       title: deriveTitle(result.title || request.decisionText),
       decisionText: request.decisionText,
       status: routing === 'ok' ? 'intake_ready' : 'draft',
@@ -128,6 +176,7 @@ export class SimulationsService {
     id: string,
     request: IntakeAnswersRequest,
   ): Promise<SimulationDto> {
+    await this.assertChangeable(auth, id);
     const doc = await this.transition(auth, id, 'intake_ready', {
       filter: { 'intake.routing': 'ok' },
       set: {
@@ -159,6 +208,8 @@ export class SimulationsService {
       );
     }
 
+    this.assertCanChangeFinished(auth, doc.completedRuns);
+    if (!auth.anonymous) await this.usage.assertCanStart(auth.userId);
     const limits = PLANS[auth.plan];
     const paths = (intake.paths ?? intake.result.proposedPaths).slice(0, limits.maxPaths);
     const horizonMonths = Math.min(DEFAULT_HORIZON_MONTHS, limits.maxHorizonMonths);
@@ -228,14 +279,20 @@ export class SimulationsService {
   /** Replace the decision model. Previous results no longer match it, so they are cleared. */
   async updateModel(auth: AuthContext, id: string, model: DecisionModel): Promise<SimulationDto> {
     assertModelWithinPlan(model, auth.plan);
+    await this.assertChangeable(auth, id);
     const doc = await this.transition(auth, id, 'model_ready', {
       set: { model, analysis: null, narrative: null, error: null, lastRunAt: null },
     });
     return toSimulationDto(doc);
   }
 
-  /** Queue a full run (engine + narrative). The pipeline moves it on; clients poll GET. */
+  /**
+   * Queue a full run (engine + narrative). The pipeline moves it on; clients poll GET. Every run
+   * uses one from the plan's quota; a run after the first one (an updated story) needs a plan
+   * with story refresh.
+   */
   async run(auth: AuthContext, id: string): Promise<SimulationDto> {
+    await this.assertChangeable(auth, id);
     return this.enqueue(auth, id, 'full');
   }
 
@@ -249,21 +306,30 @@ export class SimulationsService {
     if (result.deletedCount === 0) throw notFound();
   }
 
+  /** Use a run from the quota, queue the simulation, dispatch the pipeline (refund on failure). */
   private async enqueue(
     auth: AuthContext,
     id: string,
     mode: RunJob['mode'],
   ): Promise<SimulationDto> {
+    await this.usage.consume(auth.userId);
     const runId = randomUUID();
-    const doc = await this.transition(auth, id, 'queued', {
-      filter: mode === 'full' ? { model: { $ne: null } } : { analysis: { $ne: null } },
-      set: { pipelineRunId: runId, error: null },
-    });
-    const job: RunJob = { simulationId: id, userId: auth.userId, runId, mode };
+    let doc;
+    try {
+      doc = await this.transition(auth, id, 'queued', {
+        filter: mode === 'full' ? { model: { $ne: null } } : { analysis: { $ne: null } },
+        set: { pipelineRunId: runId, error: null },
+      });
+    } catch (error) {
+      await this.usage.refund(auth.userId);
+      throw error;
+    }
+    const job: RunJob = { simulationId: id, userId: auth.userId, runId, mode, charged: true };
     try {
       await this.dispatcher.dispatch(job);
     } catch (error) {
       this.logger.error(`Could not queue run ${runId}: ${(error as Error).message}`);
+      await this.usage.refund(auth.userId);
       const message = 'The simulation queue is unavailable. Please try again.';
       await this.simulations
         .updateOne(

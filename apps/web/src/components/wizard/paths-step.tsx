@@ -15,14 +15,16 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { PATH_TYPES, type PathType, type ProposedPath } from '@futuria/shared';
+import { PATH_TYPES, PLANS, type PathType, type PlanId, type ProposedPath } from '@futuria/shared';
 import { Notice } from '@/components/notice';
 import { PathSwatch } from '@/components/results/path-color';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input, Label, Textarea } from '@/components/ui/input';
 import { RadioCard, RadioGroup } from '@/components/ui/radio-group';
+import { openGate } from '@/lib/gate-events';
 import { PATH_TYPE_HINTS, PATH_TYPE_LABELS, newPathId } from '@/lib/paths';
+import { pathsUpgrade } from '@/lib/plan-gates';
 import { cn } from '@/lib/utils';
 
 const PATH_TYPE_ICONS: Record<PathType, LucideIcon> = {
@@ -134,6 +136,7 @@ function PathEditor({
 export function PathsStep({
   paths,
   maxPaths,
+  plan,
   onChange,
   onBack,
   onSubmit,
@@ -141,6 +144,7 @@ export function PathsStep({
 }: {
   paths: ProposedPath[];
   maxPaths: number;
+  plan: PlanId;
   onChange: (paths: ProposedPath[]) => void;
   /** Undefined when there were no questions to go back to. */
   onBack?: () => void;
@@ -152,6 +156,7 @@ export function PathsStep({
   const update = (id: string, patch: Partial<ProposedPath>) =>
     onChange(paths.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const invalid = paths.some((p) => !p.name.trim());
+  const upgrade = pathsUpgrade(plan);
 
   // Keep keyboard focus on the row someone just closed or next to the one they removed.
   const focusNext = useRef<string | null>(null);
@@ -309,7 +314,20 @@ export function PathsStep({
       ) : (
         <p className="text-sm text-muted">
           You&apos;re comparing {maxPaths} paths, the most your plan allows. Remove one to try a
-          different kind.
+          different kind
+          {upgrade ? (
+            <>
+              , or{' '}
+              <button
+                type="button"
+                className="font-medium text-accent underline-offset-4 hover:underline"
+                onClick={() => openGate({ kind: 'upgrade', reason: 'paths', plan: upgrade })}
+              >
+                compare up to {PLANS[upgrade].maxPaths} with {PLANS[upgrade].name}
+              </button>
+            </>
+          ) : null}
+          .
         </p>
       )}
 

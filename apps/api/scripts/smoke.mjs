@@ -4,8 +4,12 @@
  *
  *   pnpm --filter @futuria/api smoke               # keeps the new simulation
  *   pnpm --filter @futuria/api smoke --cleanup     # deletes it afterwards
- *   pnpm --filter @futuria/api smoke --renarrate   # also refreshes the story (more AI calls)
- *   pnpm --filter @futuria/api smoke --user alice  # act as another dev user
+ *   pnpm --filter @futuria/api smoke --renarrate   # also checks the story refresh gate
+ *   pnpm --filter @futuria/api smoke --user alice  # act as a given dev user
+ *
+ * Each run acts as a new dev user ("smoke-<time>") on the Free plan, which allows 3 simulations
+ * in total, so repeated runs never hit the quota. Story refresh is a paid feature: on Free,
+ * --renarrate expects the 403 plan_feature gate; for a user on Pro it refreshes the story.
  *
  * Needs the API running (`pnpm dev`) in dev auth mode. With AI_MODE=anthropic this makes real
  * Claude calls (one full simulation, about $0.35-0.45). Set API_URL to target another address.
@@ -19,7 +23,7 @@ const option = (name, fallback) => {
 };
 
 const API = (process.env.API_URL ?? 'http://localhost:4000').replace(/\/+$/, '');
-const USER = option('user', 'dev-user');
+const USER = option('user', `smoke-${Date.now().toString(36)}`);
 const OTHER_USER = USER === 'bob' ? 'carol' : 'bob';
 const CLEANUP = hasFlag('cleanup');
 const DECISION = 'What if I quit my job to become a freelance UX designer?';
@@ -208,10 +212,19 @@ if (story) {
 }
 
 if (hasFlag('renarrate')) {
-  t = performance.now();
-  await call('POST', `/simulations/${draft.id}/renarrate`, { expect: 202 });
-  await waitForRun();
-  log(`POST /simulations/:id/renarrate -> ready again in ${seconds(t)}`);
+  const me = await call('GET', '/me');
+  if (me.limits.features.storyRefresh) {
+    t = performance.now();
+    await call('POST', `/simulations/${draft.id}/renarrate`, { expect: 202 });
+    await waitForRun();
+    log(`POST /simulations/:id/renarrate -> ready again in ${seconds(t)}`);
+  } else {
+    const gate = await call('POST', `/simulations/${draft.id}/renarrate`, { expect: 403 });
+    if (gate.code !== 'plan_feature') fail(`renarrate on ${me.plan}: expected plan_feature`);
+    log(
+      `POST /simulations/:id/renarrate on ${me.plan} -> 403 plan_feature (paid feature, expected)`,
+    );
+  }
 }
 
 await call('GET', `/simulations/${draft.id}`, { user: OTHER_USER, expect: 404 });

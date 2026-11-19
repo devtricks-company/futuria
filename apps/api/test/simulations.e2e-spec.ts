@@ -2,7 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { type DecisionModelInput, SARA_MODEL, type SimulationDto } from '@futuria/shared';
-import { closeTestApp, createTestApp, settlePipeline } from './test-app.js';
+import { closeTestApp, createTestApp, setPlan, settlePipeline } from './test-app.js';
 
 const DECISION = 'What if I quit my job to become a freelance UX designer?';
 
@@ -16,9 +16,12 @@ describe('Simulations API (e2e)', () => {
   });
   const alice = () => as('alice');
   const bob = () => as('bob');
+  /** On Pro: re-runs ("Update the story") are a paid feature. */
+  const pat = () => as('pat');
 
   beforeAll(async () => {
     app = await createTestApp();
+    await setPlan(app, 'pat', 'pro');
   });
 
   afterAll(async () => {
@@ -27,7 +30,12 @@ describe('Simulations API (e2e)', () => {
 
   it('creates the user on first request with the Free plan', async () => {
     const res = await alice().get('/me').expect(200);
-    expect(res.body).toMatchObject({ plan: 'free', usage: { simulationsUsed: 0 } });
+    expect(res.body).toMatchObject({
+      plan: 'free',
+      anonymous: false,
+      usage: { simulationsUsed: 0, periodEnd: null },
+      billing: { enabled: false, subscription: null },
+    });
     expect(res.body.limits.maxHorizonMonths).toBe(12);
     const again = await alice().get('/me').expect(200);
     expect(again.body.id).toBe(res.body.id);
@@ -43,22 +51,23 @@ describe('Simulations API (e2e)', () => {
 
   /** POST /run, wait for the in-process pipeline, return the finished simulation. */
   const runToEnd = async (id: string): Promise<SimulationDto> => {
-    const queued = await alice().post(`/simulations/${id}/run`).expect(202);
+    const queued = await pat().post(`/simulations/${id}/run`).expect(202);
     expect(queued.body.status).toBe('queued');
     await settlePipeline(app);
-    return (await alice().get(`/simulations/${id}`).expect(200)).body as SimulationDto;
+    return (await pat().get(`/simulations/${id}`).expect(200)).body as SimulationDto;
   };
 
   it('runs the full lifecycle: draft -> model_ready -> queued -> ready', async () => {
-    const created = await alice().post('/simulations').send({ decisionText: DECISION }).expect(201);
+    const created = await pat().post('/simulations').send({ decisionText: DECISION }).expect(201);
     const draft = created.body as SimulationDto;
     expect(draft).toMatchObject({ status: 'draft', title: DECISION, model: null, analysis: null });
 
-    // Running without a model is a conflict, not a crash.
-    const early = await alice().post(`/simulations/${draft.id}/run`).expect(409);
+    // Running without a model is a conflict, not a crash (and uses no quota).
+    const early = await pat().post(`/simulations/${draft.id}/run`).expect(409);
     expect(early.body.code).toBe('model_missing');
+    expect((await pat().get('/me').expect(200)).body.usage.simulationsUsed).toBe(0);
 
-    const withModel = await alice()
+    const withModel = await pat()
       .patch(`/simulations/${draft.id}/model`)
       .send({ model: SARA_MODEL })
       .expect(200);
@@ -80,12 +89,13 @@ describe('Simulations API (e2e)', () => {
     const freelance = ready.analysis!.result.paths.find((p) => p.pathId === 'freelance')!;
     expect(freelance.scenarios.realistic.sampled).toHaveProperty(['baseline.monthlyExpenses']);
 
-    // Re-running uses the stored seed, so results are identical.
+    // Re-running uses the stored seed, so results are identical. Each run uses one.
     const rerun = await runToEnd(draft.id);
     expect(rerun.analysis).toEqual(ready.analysis);
+    expect((await pat().get('/me').expect(200)).body.usage.simulationsUsed).toBe(2);
 
     // Editing the model clears results that no longer match it.
-    const edited = await alice()
+    const edited = await pat()
       .patch(`/simulations/${draft.id}/model`)
       .send({ model: { ...SARA_MODEL, paths: SARA_MODEL.paths.slice(0, 2) } })
       .expect(200);
@@ -117,7 +127,7 @@ describe('Simulations API (e2e)', () => {
       .post('/simulations')
       .send({ decisionText: DECISION, model: { ...SARA_MODEL, horizonMonths: 24 } })
       .expect(403);
-    expect(res.body).toMatchObject({ code: 'plan_limit' });
+    expect(res.body).toMatchObject({ code: 'plan_limit', requiredPlan: 'pro' });
     expect(res.body.message).toContain('12 months');
   });
 
@@ -134,7 +144,7 @@ describe('Simulations API (e2e)', () => {
     expect(bobList.body).toEqual([]);
 
     const aliceList = await alice().get('/simulations').expect(200);
-    expect(aliceList.body.length).toBeGreaterThanOrEqual(3);
+    expect(aliceList.body.length).toBeGreaterThanOrEqual(2);
     expect(aliceList.body[0]).toMatchObject({ id, status: 'draft', pathCount: 0 });
   });
 

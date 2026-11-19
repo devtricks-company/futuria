@@ -14,6 +14,8 @@ export interface RunJob {
   runId: string;
   /** "full": engine + narrative. "narrate": refresh the story, keep the engine results. */
   mode: 'full' | 'narrate';
+  /** The run used one from the user's quota; a failed run gives it back. */
+  charged?: boolean;
 }
 
 export interface ClaimedRun {

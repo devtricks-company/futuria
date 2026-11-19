@@ -6,7 +6,13 @@ import {
   proposedPathSchema,
 } from './ai';
 import { type DecisionModel, PATH_TYPES, decisionModelSchema } from './decision-model';
-import type { PlanId, PlanLimits } from './plans';
+import {
+  BILLABLE_PLANS,
+  BILLING_INTERVALS,
+  type BillingInterval,
+  type PlanId,
+  type PlanLimits,
+} from './plans';
 import type { FullAnalysis } from './results';
 
 /*
@@ -136,12 +142,65 @@ export interface SimulationSummaryDto {
   lastRunAt: string | null;
 }
 
+export interface SubscriptionDto {
+  /** Stripe subscription status (active, trialing, past_due, canceled, ...). */
+  status: string;
+  interval: BillingInterval | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
 export interface MeDto {
   id: string;
   plan: PlanId;
-  usage: { periodStart: string; simulationsUsed: number };
+  /** A signed-out visitor with drafts (no account yet). They must sign up to run. */
+  anonymous: boolean;
+  usage: {
+    periodStart: string;
+    /** When the monthly quota resets; null for lifetime quotas (Free). */
+    periodEnd: string | null;
+    simulationsUsed: number;
+  };
   limits: PlanLimits;
+  billing: {
+    /** False when the API runs without Stripe keys (local dev, CI). */
+    enabled: boolean;
+    subscription: SubscriptionDto | null;
+  };
 }
+
+/* ---------- Billing ---------- */
+
+export const checkoutRequestSchema = z.object({
+  plan: z.enum(BILLABLE_PLANS),
+  interval: z.enum(BILLING_INTERVALS),
+});
+export type CheckoutRequest = z.output<typeof checkoutRequestSchema>;
+
+export const billingSyncRequestSchema = z.object({
+  sessionId: z
+    .string()
+    .trim()
+    .regex(/^cs_[A-Za-z0-9_]{1,250}$/, 'Invalid checkout session id'),
+});
+export type BillingSyncRequest = z.output<typeof billingSyncRequestSchema>;
+
+export interface BillingUrlDto {
+  url: string;
+}
+
+/* ---------- Errors ---------- */
+
+/**
+ * Error codes the web app reacts to:
+ * - plan_limit: the model needs a bigger plan (horizon, paths)
+ * - plan_feature: the feature needs a bigger plan (story refresh, PDF export)
+ * - quota_exceeded: no simulation runs left in this period
+ * - signup_required: a signed-out visitor tried something that needs an account
+ * - billing_disabled / already_subscribed: checkout can't start
+ */
+export const PLAN_ERROR_CODES = ['plan_limit', 'plan_feature', 'quota_exceeded'] as const;
+export type PlanErrorCode = (typeof PLAN_ERROR_CODES)[number];
 
 /** Error body for every 4xx/5xx response. */
 export interface ApiErrorBody {
@@ -150,4 +209,6 @@ export interface ApiErrorBody {
   message: string;
   code?: string;
   issues?: { path: string; message: string }[];
+  /** On plan errors: the cheapest plan that would allow the request. */
+  requiredPlan?: PlanId;
 }

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { AiModule } from './ai/ai.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { BillingModule } from './billing/billing.module.js';
 import { MongoExceptionFilter } from './common/mongo-exception.filter.js';
 import { createValidationPipe } from './common/validation.js';
 import { validateEnv } from './config/env.js';
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     AuthModule,
     SimulationsModule,
+    BillingModule,
   ],
   controllers: [HealthController],
   providers: [

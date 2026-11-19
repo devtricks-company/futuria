@@ -1,6 +1,6 @@
 'use client';
 
-import { CircleHelp, LayoutGrid, Menu, Plus, Tag, UserRound } from 'lucide-react';
+import { CircleHelp, CreditCard, LayoutGrid, Menu, Plus, Tag, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
@@ -15,6 +15,7 @@ const NAV = [
   { href: '/#pricing', label: 'Pricing', icon: Tag, marketing: true },
   { href: '/dashboard', label: 'My simulations', icon: LayoutGrid, marketing: false },
   { href: '/settings/profile', label: 'Profile', icon: UserRound, marketing: false },
+  { href: '/settings/billing', label: 'Plan', icon: CreditCard, marketing: false },
 ] as const;
 
 const isActive = (pathname: string | null, href: string) =>

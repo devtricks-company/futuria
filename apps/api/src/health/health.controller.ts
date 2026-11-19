@@ -14,6 +14,8 @@ export interface HealthResponse {
   /** "fixture" means no real Claude calls (tests, offline work). */
   ai: Env['AI_MODE'];
   pipeline: Env['PIPELINE_MODE'];
+  /** "disabled" means no Stripe keys: checkout answers 503. */
+  billing: Env['BILLING_MODE'];
   time: string;
 }
 
@@ -35,6 +37,7 @@ export class HealthController {
       database: this.connection.readyState === 1 ? 'up' : 'down',
       ai: this.config.get('AI_MODE', { infer: true }),
       pipeline: this.config.get('PIPELINE_MODE', { infer: true }),
+      billing: this.config.get('BILLING_MODE', { infer: true }),
       time: new Date().toISOString(),
     };
   }

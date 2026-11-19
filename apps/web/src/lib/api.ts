@@ -1,8 +1,11 @@
 import type {
   ApiErrorBody,
+  BillingUrlDto,
+  CheckoutRequest,
   DecisionModel,
   IntakeAnswersRequest,
   MeDto,
+  PlanId,
   Profile,
   ProfileDto,
   SimulationDto,
@@ -21,6 +24,8 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string | undefined;
   readonly issues: ApiErrorBody['issues'];
+  /** On plan errors: the cheapest plan that would allow the request. */
+  readonly requiredPlan: PlanId | undefined;
 
   constructor(status: number, body: Partial<ApiErrorBody> | null) {
     super(body?.message || `Request failed (${status})`);
@@ -28,6 +33,7 @@ export class ApiError extends Error {
     this.status = status;
     this.code = body?.code;
     this.issues = body?.issues;
+    this.requiredPlan = body?.requiredPlan;
   }
 
   /** Worth retrying: the server or AI was busy or unavailable, not a problem with the request. */
@@ -87,6 +93,13 @@ export const api = {
     request<SimulationDto>('PATCH', `/simulations/${id}/model`, { model }),
   /** Queue the engine + story pipeline (202); poll getSimulation until ready or failed. */
   run: (id: string) => request<SimulationDto>('POST', `/simulations/${id}/run`),
+
+  /** Start Stripe Checkout; redirect the browser to the returned URL. */
+  checkout: (body: CheckoutRequest) => request<BillingUrlDto>('POST', '/billing/checkout', body),
+  /** Open the Stripe Customer Portal (change plan, cancel, invoices). */
+  portal: () => request<BillingUrlDto>('POST', '/billing/portal'),
+  /** Sync the plan right after Checkout, before the webhook arrives. */
+  syncBilling: (sessionId: string) => request<void>('POST', '/billing/sync', { sessionId }),
 };
 
 export const queryKeys = {

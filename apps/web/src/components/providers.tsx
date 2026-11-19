@@ -1,13 +1,24 @@
 'use client';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { GateProvider } from '@/components/billing/gate-provider';
 import { ApiError } from '@/lib/api';
+import { openGate } from '@/lib/gate-events';
+import { isSignupRequired, upgradeFromError } from '@/lib/plan-gates';
 
 let browserQueryClient: QueryClient | undefined;
 
 function makeQueryClient(): QueryClient {
   return new QueryClient({
+    // Any mutation that hits a plan gate opens the upgrade dialog or the signup gate.
+    mutationCache: new MutationCache({
+      onError: (error) => {
+        const upgrade = upgradeFromError(error);
+        if (upgrade) openGate({ kind: 'upgrade', ...upgrade });
+        else if (isSignupRequired(error)) openGate({ kind: 'signup' });
+      },
+    }),
     defaultOptions: {
       queries: {
         refetchOnWindowFocus: false,
@@ -28,5 +39,9 @@ function getQueryClient(): QueryClient {
 }
 
 export function Providers({ children }: { children: ReactNode }) {
-  return <QueryClientProvider client={getQueryClient()}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={getQueryClient()}>
+      <GateProvider>{children}</GateProvider>
+    </QueryClientProvider>
+  );
 }

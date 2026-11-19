@@ -1,9 +1,9 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, ChevronDown, Pencil, Play, Sparkles, Undo2 } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Lock, Pencil, Play, Sparkles, Undo2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Assumption, DecisionModel, SimulationDto } from '@futuria/shared';
+import type { Assumption, DecisionModel, PlanId, SimulationDto } from '@futuria/shared';
 import { Notice } from '@/components/notice';
 import { PathSwatch } from '@/components/results/path-color';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import { Segmented, SegmentedItem } from '@/components/ui/toggle-group';
 import { Stepper } from '@/components/wizard/stepper';
 import { ValueEditor, valueParts } from '@/components/wizard/value-editor';
 import { api, errorMessage, queryKeys } from '@/lib/api';
+import { openGate } from '@/lib/gate-events';
 import { useNavigate } from '@/lib/navigation';
 import {
   type FieldGroup,
@@ -23,9 +24,12 @@ import {
   setFieldValue,
 } from '@/lib/model-fields';
 import { PATH_TYPE_HINTS } from '@/lib/paths';
+import { horizonUpgrade, isSignupRequired } from '@/lib/plan-gates';
 import { cn } from '@/lib/utils';
 
 const HORIZONS = [12, 24, 36, 60] as const;
+/** Set on the return URL of the signup gate: run the simulation as soon as the account is back. */
+export const RUN_AFTER_SIGNUP = 'run';
 
 /** DOM ids from field keys like "freelance:freelance.hourlyRate". */
 const domId = (key: string) => key.replace(/[^a-zA-Z0-9-]/g, '-');
@@ -394,11 +398,14 @@ function EstimateProgress({ checked, total }: { checked: number; total: number }
  */
 export function AssumptionsStep({
   simulation,
-  maxHorizonMonths,
+  plan,
+  anonymous,
   onEditAnswers,
 }: {
   simulation: SimulationDto;
-  maxHorizonMonths: number;
+  plan: PlanId;
+  /** A signed-out visitor: running is the signup gate (journey step 5). */
+  anonymous: boolean;
   onEditAnswers?: () => void;
 }) {
   const navigate = useNavigate();
@@ -451,9 +458,40 @@ export function AssumptionsStep({
     },
   });
 
-  const busy = save.isPending || run.isPending || run.isSuccess;
-  const error = run.error ?? save.error;
-  const horizons = HORIZONS.filter((h) => h <= maxHorizonMonths);
+  const pathCount = model.paths.length;
+  const returnTo = `/new/${simulation.id}?${RUN_AFTER_SIGNUP}=1`;
+  // The signup gate: keep the edits, then ask for an account. Running comes after.
+  const gate = useMutation({
+    mutationFn: async () => {
+      if (dirty) {
+        const updated = await api.updateModel(simulation.id, model);
+        queryClient.setQueryData(queryKeys.simulation(simulation.id), updated);
+        setDirty(false);
+      }
+    },
+    onSuccess: () => openGate({ kind: 'signup', returnTo, pathCount }),
+  });
+
+  // Back from the signup gate with an account: start the run once.
+  const autoRun = useRef(false);
+  useEffect(() => {
+    if (anonymous || autoRun.current) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get(RUN_AFTER_SIGNUP) !== '1') return;
+    autoRun.current = true;
+    url.searchParams.delete(RUN_AFTER_SIGNUP);
+    window.history.replaceState(window.history.state, '', url.pathname + url.search);
+    run.mutate();
+  }, [anonymous, run]);
+
+  const busy = save.isPending || run.isPending || run.isSuccess || gate.isPending;
+  // The signup gate opens as a dialog; its 401 isn't an error to show here.
+  const error = [run.error, save.error, gate.error].find((e) => e && !isSignupRequired(e));
+  const chooseHorizon = (months: number) => {
+    const upgrade = horizonUpgrade(months, plan);
+    if (upgrade) openGate({ kind: 'upgrade', reason: 'horizon', plan: upgrade });
+    else change({ ...model, horizonMonths: months });
+  };
 
   return (
     // Controls scroll (and focus) into view above the fixed action bar, never under it.
@@ -479,24 +517,34 @@ export function AssumptionsStep({
 
       {toCheck.size ? <EstimateProgress checked={checked} total={toCheck.size} /> : null}
 
-      {horizons.length > 1 ? (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p id="horizon-label" className="text-sm font-medium">
-            How far ahead to simulate
-          </p>
-          <Segmented
-            aria-labelledby="horizon-label"
-            value={String(model.horizonMonths)}
-            onValueChange={(value) => change({ ...model, horizonMonths: Number(value) })}
-          >
-            {horizons.map((h) => (
-              <SegmentedItem key={h} value={String(h)}>
-                {h} months
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p id="horizon-label" className="text-sm font-medium">
+          How far ahead to simulate
+        </p>
+        <Segmented
+          aria-labelledby="horizon-label"
+          value={String(model.horizonMonths)}
+          onValueChange={(value) => chooseHorizon(Number(value))}
+        >
+          {HORIZONS.map((h) => {
+            const locked = horizonUpgrade(h, plan) !== null;
+            return (
+              <SegmentedItem
+                key={h}
+                value={String(h)}
+                aria-label={locked ? `${h} months (paid plans)` : `${h} months`}
+                // Four choices fit a phone: "24 mo" there, "24 months" from sm up.
+                className="gap-1 px-2.5 sm:gap-1.5 sm:px-3.5"
+              >
+                {locked ? <Lock className="size-3 shrink-0" aria-hidden /> : null}
+                {h}
+                <span className="sm:hidden">mo</span>
+                <span className="hidden sm:inline">months</span>
               </SegmentedItem>
-            ))}
-          </Segmented>
-        </div>
-      ) : null}
+            );
+          })}
+        </Segmented>
+      </div>
 
       {groups.map((group, index) => (
         <GroupCard
@@ -545,10 +593,17 @@ export function AssumptionsStep({
                 Save
               </Button>
             ) : null}
-            <Button onClick={() => run.mutate()} disabled={busy || editingKey !== null}>
-              <Play />
-              {run.isPending || run.isSuccess ? 'Starting…' : 'Run simulation'}
-            </Button>
+            {anonymous ? (
+              <Button onClick={() => gate.mutate()} disabled={busy || editingKey !== null}>
+                <Play />
+                {gate.isPending ? 'Saving…' : `See my ${pathCount} futures`}
+              </Button>
+            ) : (
+              <Button onClick={() => run.mutate()} disabled={busy || editingKey !== null}>
+                <Play />
+                {run.isPending || run.isSuccess ? 'Starting…' : 'Run simulation'}
+              </Button>
+            )}
           </div>
         </div>
       </div>

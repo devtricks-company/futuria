@@ -1,18 +1,12 @@
-import { Calculator, Check, ChevronDown, Sparkles } from 'lucide-react';
+import { Calculator, ChevronDown, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
-import {
-  PLANS,
-  type PlanLimits,
-  SARA_MODEL,
-  SCENARIOS,
-  decisionModelSchema,
-  likelyValue,
-} from '@futuria/shared';
+import { PLANS, SARA_MODEL, SCENARIOS, decisionModelSchema, likelyValue } from '@futuria/shared';
 import { analyze, formatMoney } from '@futuria/engine';
 import { FeatureTiles, PrivacyNotes, rangeRows } from '@/components/landing/feature-tiles';
 import { FuturesChart } from '@/components/landing/futures-chart';
 import { LiveDemo } from '@/components/landing/live-demo';
+import { Pricing } from '@/components/landing/pricing';
 import { CountOnView } from '@/components/motion/count-up';
 import { Marquee } from '@/components/motion/marquee';
 import { Reveal } from '@/components/motion/reveal';
@@ -47,14 +41,6 @@ const DECISIONS_STRIP = [
   'Go back to school',
   'Take a sabbatical',
 ] as const;
-
-const FEATURE_LABELS: [keyof PlanLimits['features'], string][] = [
-  ['storyRefresh', 'Story refresh after tweaks'],
-  ['pdfExport', 'PDF export (soon)'],
-  ['realityCheck', 'Monthly Reality Check (soon)'],
-  ['askTheFuture', 'Ask the Future chat (soon)'],
-  ['advancedVariables', 'Taxes, inflation and more variables (soon)'],
-];
 
 /** Sara's sample decision, simulated and analyzed when the page is built. */
 function sara() {
@@ -184,63 +170,6 @@ function Stats({ runs }: { runs: number }) {
         </Reveal>
       ))}
     </ul>
-  );
-}
-
-function PlanCard({ plan, highlight }: { plan: PlanLimits; highlight?: boolean }) {
-  const quota =
-    plan.simulationsPeriod === 'lifetime'
-      ? `${plan.simulations} simulations to start`
-      : `${plan.simulations} simulations a month`;
-  const free = plan.priceUsdMonthly === 0;
-  return (
-    <li
-      className={cn(
-        'relative flex flex-col rounded-3xl p-7 transition-transform duration-500 hover:-translate-y-1 sm:p-8',
-        highlight
-          ? 'border-gradient shadow-[0_30px_80px_-30px_rgb(11_207_119/0.45)]'
-          : 'border border-border bg-surface/60',
-      )}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-lg font-bold">{plan.name}</h3>
-        {highlight ? (
-          <span className="rounded-full bg-brand px-3 py-1 text-xs font-bold text-on-brand">
-            Start here
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-4 flex items-baseline gap-1.5">
-        <span className="font-display text-5xl tabular-nums">${plan.priceUsdMonthly}</span>
-        <span className="text-muted">a month</span>
-      </p>
-      <ul className="mt-7 flex flex-col gap-3 border-t border-border pt-7 text-sm">
-        {[
-          quota,
-          `Up to ${plan.maxHorizonMonths}-month horizon`,
-          `Up to ${plan.maxPaths} options per decision`,
-          ...FEATURE_LABELS.filter(([key]) => plan.features[key]).map(([, label]) => label),
-        ].map((line) => (
-          <li key={line} className="flex gap-3">
-            <span className="mt-px flex size-4.5 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent">
-              <Check className="size-3" strokeWidth={3} aria-hidden />
-            </span>
-            {line}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-auto pt-9">
-        {free ? (
-          <Button asChild className="w-full">
-            <Link href="/new">Start free</Link>
-          </Button>
-        ) : (
-          <Button variant="secondary" className="w-full" disabled>
-            Coming soon
-          </Button>
-        )}
-      </div>
-    </li>
   );
 }
 
@@ -445,11 +374,7 @@ export default function Home() {
           title="Simple pricing"
           intro="Start free. Moving sliders never costs anything, because it runs on your device."
         >
-          <ul className="grid gap-5 md:grid-cols-3">
-            <PlanCard plan={PLANS.free} highlight />
-            <PlanCard plan={PLANS.pro} />
-            <PlanCard plan={PLANS.premium} />
-          </ul>
+          <Pricing />
           <p className="mt-8 text-center text-sm text-muted">
             A {PLANS.business.name} plan for teams (${PLANS.business.priceUsdMonthly} a month) with
             shared workspaces is planned.
