@@ -44,6 +44,21 @@ pnpm --filter @futuria/api stripe:listen  # Stripe CLI webhook forwarding (event
 npx inngest-cli@latest dev -u http://localhost:4000/api/inngest   # Inngest Dev Server (UI on :8288)
 ```
 
+## Staging deploy
+
+Web on Vercel (project root `apps/web`), API on Azure Container Apps. The full setup, the env vars
+and troubleshooting are in `docs/DEPLOY.md`.
+
+- **API image:** `apps/api/Dockerfile`, built from the repo root (`.dockerignore` drops every
+  `.env`). It runs inside the pnpm workspace with production dependencies only.
+- **Deploys:** `.github/workflows/deploy-api-staging.yml` publishes the image to
+  `ghcr.io/devtricks-company/futuria-api` on pushes to `main`, then rolls it out with OIDC (repo
+  variables `AZURE_*`).
+- **Staging runs `NODE_ENV=production` with test keys.** It uses the Clerk development instance,
+  Stripe test mode and real Claude, on the database `futuria_staging`.
+- **Indexes:** production sets `autoIndex` off, so run `db:setup` against the staging database
+  after schema changes.
+
 ## Local services
 
 - **MongoDB:** MongoDB Atlas, via `MONGODB_URI` (`mongodb+srv://...`) in `apps/api/.env`. The
