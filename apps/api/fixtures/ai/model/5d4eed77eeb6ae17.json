@@ -1,0 +1,554 @@
+{
+  "step": "model",
+  "recordedAt": "2026-11-17T12:32:14.963Z",
+  "model": "claude-opus-5-5",
+  "promptVersion": "model@2",
+  "input": {
+    "decisionText": "What if I quit my job to become a freelance UX designer?",
+    "intake": {
+      "inScope": true,
+      "category": "freelance",
+      "safetyFlag": "none",
+      "title": "Quit job to freelance as UX designer",
+      "questions": [
+        {
+          "id": "monthly_take_home",
+          "prompt": "What is your current monthly take-home pay after taxes?",
+          "kind": "money",
+          "helpText": "Use the amount that lands in your account each month.",
+          "options": [],
+          "defaultValue": 4000,
+          "informs": "baseline.currentMonthlyNetSalary"
+        },
+        {
+          "id": "monthly_expenses",
+          "prompt": "How much do you spend on living expenses in a typical month?",
+          "kind": "money",
+          "helpText": "Include rent, food, insurance, debt payments and subscriptions. Most people underestimate by 10-20%.",
+          "options": [],
+          "defaultValue": 2800,
+          "informs": "baseline.monthlyExpenses"
+        },
+        {
+          "id": "savings",
+          "prompt": "How much savings could you draw on today if income stopped?",
+          "kind": "money",
+          "helpText": "Count cash and easily accessible savings, not retirement accounts.",
+          "options": [],
+          "defaultValue": 15000,
+          "informs": "baseline.startingCash"
+        },
+        {
+          "id": "existing_leads",
+          "prompt": "How many potential clients or warm leads do you already have lined up?",
+          "kind": "choice",
+          "helpText": "Past colleagues, agencies or companies that have shown interest count as warm leads.",
+          "options": [
+            "Signed work ready to start",
+            "A few warm leads",
+            "Some contacts but nothing concrete",
+            "Starting from scratch"
+          ],
+          "defaultValue": "Some contacts but nothing concrete",
+          "informs": "monthsToFirstClient"
+        },
+        {
+          "id": "hourly_rate",
+          "prompt": "What hourly rate do you expect to charge clients?",
+          "kind": "money",
+          "helpText": "Experienced UX designers often charge 1.5-3x the hourly equivalent of their salary.",
+          "options": [],
+          "defaultValue": 60,
+          "informs": "hourlyRate"
+        },
+        {
+          "id": "billable_hours",
+          "prompt": "How many hours per week do you expect to bill once you are established?",
+          "kind": "hours",
+          "helpText": "Most full-time freelancers bill 15-30 hours a week; the rest goes to sales and admin.",
+          "options": [],
+          "defaultValue": 22,
+          "informs": "billableHoursPerWeek"
+        },
+        {
+          "id": "can_return_to_job",
+          "prompt": "If freelancing does not work out, how easily could you get a design job again?",
+          "kind": "choice",
+          "helpText": "This shapes how a fallback could limit the downside.",
+          "options": [
+            "Easily, within 1-3 months",
+            "Possibly, within 3-6 months",
+            "It would be hard"
+          ],
+          "defaultValue": "Possibly, within 3-6 months",
+          "informs": null
+        }
+      ],
+      "proposedPaths": [
+        {
+          "id": "stay",
+          "name": "Stay in your current job",
+          "type": "stay",
+          "summary": "You keep your salary and benefits, with typical raises and a small chance of layoff."
+        },
+        {
+          "id": "freelance",
+          "name": "Quit & freelance full-time",
+          "type": "freelance",
+          "summary": "You leave your job now and build a full-time UX design practice, living on savings until client work ramps up."
+        },
+        {
+          "id": "hybrid",
+          "name": "Freelance on the side first",
+          "type": "hybrid",
+          "summary": "You keep your job for several months while landing first clients on evenings and weekends, then switch when side income or savings make it safer."
+        }
+      ]
+    },
+    "answers": {
+      "monthly_take_home": 4000,
+      "monthly_expenses": 2800,
+      "savings": 15000,
+      "existing_leads": "Some contacts but nothing concrete",
+      "hourly_rate": 60,
+      "billable_hours": 22,
+      "can_return_to_job": "Possibly, within 3-6 months"
+    },
+    "paths": [
+      {
+        "id": "stay",
+        "name": "Stay in your current job",
+        "type": "stay",
+        "summary": "You keep your salary and benefits, with typical raises and a small chance of layoff."
+      },
+      {
+        "id": "freelance",
+        "name": "Quit & freelance full-time",
+        "type": "freelance",
+        "summary": "You leave your job now and build a full-time UX design practice, living on savings until client work ramps up."
+      },
+      {
+        "id": "hybrid",
+        "name": "Freelance on the side first",
+        "type": "hybrid",
+        "summary": "You keep your job for several months while landing first clients on evenings and weekends, then switch when side income or savings make it safer."
+      }
+    ],
+    "horizonMonths": 12
+  },
+  "output": {
+    "baseline": {
+      "currency": "USD",
+      "startingCash": 15000,
+      "monthlyExpenses": {
+        "low": 2700,
+        "likely": 2800,
+        "high": 3250
+      },
+      "annualExpenseGrowth": 0.03,
+      "currentMonthlyNetSalary": 4000,
+      "otherMonthlyIncome": 0,
+      "emergencyFloor": 0
+    },
+    "paths": {
+      "path_1": {
+        "annualRaisePct": {
+          "low": 0.02,
+          "likely": 0.03,
+          "high": 0.05
+        },
+        "annualLayoffProb": 0.05,
+        "monthsToReemploy": {
+          "low": 2,
+          "likely": 4,
+          "high": 6
+        }
+      },
+      "path_2": {
+        "monthsToFirstClient": {
+          "low": 1,
+          "likely": 2,
+          "high": 5
+        },
+        "hourlyRate": {
+          "low": 50,
+          "likely": 60,
+          "high": 65
+        },
+        "billableHoursPerWeek": {
+          "low": 16,
+          "likely": 22,
+          "high": 25
+        },
+        "rampMonths": {
+          "low": 3,
+          "likely": 5,
+          "high": 9
+        },
+        "initialBookedHoursPerWeek": 0,
+        "monthlyClientLossProb": 0.08,
+        "businessCostsMonthly": {
+          "low": 200,
+          "likely": 350,
+          "high": 550
+        },
+        "taxRate": {
+          "low": 0.22,
+          "likely": 0.28,
+          "high": 0.35
+        },
+        "setupCost": 1500,
+        "revenueVolatility": 0.2
+      },
+      "path_3": {
+        "transitionMonths": {
+          "low": 3,
+          "likely": 6,
+          "high": 9
+        },
+        "transitionSalaryFraction": 1,
+        "sideHoursPerWeek": {
+          "low": 4,
+          "likely": 8,
+          "high": 12
+        },
+        "freelance": {
+          "monthsToFirstClient": {
+            "low": 1,
+            "likely": 3,
+            "high": 6
+          },
+          "hourlyRate": {
+            "low": 50,
+            "likely": 60,
+            "high": 65
+          },
+          "billableHoursPerWeek": {
+            "low": 16,
+            "likely": 22,
+            "high": 25
+          },
+          "rampMonths": {
+            "low": 3,
+            "likely": 5,
+            "high": 9
+          },
+          "initialBookedHoursPerWeek": 0,
+          "monthlyClientLossProb": 0.08,
+          "businessCostsMonthly": {
+            "low": 150,
+            "likely": 300,
+            "high": 500
+          },
+          "taxRate": {
+            "low": 0.25,
+            "likely": 0.3,
+            "high": 0.37
+          },
+          "setupCost": 1000,
+          "revenueVolatility": 0.2
+        }
+      }
+    },
+    "assumptions": [
+      {
+        "id": "currency",
+        "pathId": null,
+        "field": "baseline.currency",
+        "label": "Currency",
+        "rationale": "No currency was mentioned, so amounts are treated as US dollars. Change this if you use another currency.",
+        "source": "default",
+        "confidence": "medium"
+      },
+      {
+        "id": "starting_cash",
+        "pathId": null,
+        "field": "baseline.startingCash",
+        "label": "Savings available today",
+        "rationale": "You said you could draw on 15,000 if income stopped.",
+        "source": "user",
+        "confidence": "high"
+      },
+      {
+        "id": "expenses",
+        "pathId": null,
+        "field": "baseline.monthlyExpenses",
+        "label": "Monthly living expenses",
+        "rationale": "You estimated 2,800 a month. The range goes up to about 3,250 because people often underestimate spending by 10 to 20 percent.",
+        "source": "user",
+        "confidence": "medium"
+      },
+      {
+        "id": "expense_growth",
+        "pathId": null,
+        "field": "baseline.annualExpenseGrowth",
+        "label": "Yearly growth in expenses",
+        "rationale": "A typical inflation-level increase of about 3 percent a year.",
+        "source": "default",
+        "confidence": "medium"
+      },
+      {
+        "id": "salary",
+        "pathId": null,
+        "field": "baseline.currentMonthlyNetSalary",
+        "label": "Current take-home pay",
+        "rationale": "You said you take home 4,000 a month after taxes.",
+        "source": "user",
+        "confidence": "high"
+      },
+      {
+        "id": "other_income",
+        "pathId": null,
+        "field": "baseline.otherMonthlyIncome",
+        "label": "Other household income",
+        "rationale": "You did not mention a partner's income or other reliable income, so this is set to zero.",
+        "source": "ai_estimate",
+        "confidence": "medium"
+      },
+      {
+        "id": "floor",
+        "pathId": null,
+        "field": "baseline.emergencyFloor",
+        "label": "When savings count as run out",
+        "rationale": "Running out means savings reach zero. Raise this if you want to keep a safety buffer.",
+        "source": "default",
+        "confidence": "medium"
+      },
+      {
+        "id": "stay_raise",
+        "pathId": "stay",
+        "field": "annualRaisePct",
+        "label": "Yearly raise if you stay",
+        "rationale": "Raises of 2 to 5 percent a year are typical, with about 3 percent most likely.",
+        "source": "default",
+        "confidence": "medium"
+      },
+      {
+        "id": "stay_layoff",
+        "pathId": "stay",
+        "field": "annualLayoffProb",
+        "label": "Chance of a layoff in a year",
+        "rationale": "About a 5 percent yearly chance, in the middle of the usual 3 to 10 percent range for design roles.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "stay_reemploy",
+        "pathId": "stay",
+        "field": "monthsToReemploy",
+        "label": "Months without pay after a layoff",
+        "rationale": "You said you could likely find a design job within 3 to 6 months, so the range is 2 to 6 months with about 4 most likely.",
+        "source": "user",
+        "confidence": "medium"
+      },
+      {
+        "id": "fl_first_client",
+        "pathId": "freelance",
+        "field": "monthsToFirstClient",
+        "label": "Months until your first paying client",
+        "rationale": "You have some contacts but nothing concrete. That usually means 1 to 5 months to first paid work, with about 2 most likely.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "fl_rate",
+        "pathId": "freelance",
+        "field": "hourlyRate",
+        "label": "Hourly rate",
+        "rationale": "You expect to charge 60 an hour, about 1.7 times the hourly value of your current salary, which is in the normal range for experienced UX designers. The range dips to 50 in case early clients push back on price.",
+        "source": "user",
+        "confidence": "medium"
+      },
+      {
+        "id": "fl_hours",
+        "pathId": "freelance",
+        "field": "billableHoursPerWeek",
+        "label": "Billable hours once established",
+        "rationale": "You expect 22 hours a week. That is realistic, but the range goes down to 16 because sales and admin often take more time than planned.",
+        "source": "user",
+        "confidence": "medium"
+      },
+      {
+        "id": "fl_ramp",
+        "pathId": "freelance",
+        "field": "rampMonths",
+        "label": "Months from first client to a full workload",
+        "rationale": "Getting to a steady, full workload commonly takes 3 to 9 months. About 5 months is assumed here, given that you already have some contacts.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "fl_booked",
+        "pathId": "freelance",
+        "field": "initialBookedHoursPerWeek",
+        "label": "Work already booked",
+        "rationale": "You have no signed work yet, so no hours are booked at the start.",
+        "source": "user",
+        "confidence": "high"
+      },
+      {
+        "id": "fl_loss",
+        "pathId": "freelance",
+        "field": "monthlyClientLossProb",
+        "label": "Monthly chance of losing a client",
+        "rationale": "An 8 percent monthly chance of losing a meaningful share of work is typical when projects end or budgets get cut.",
+        "source": "default",
+        "confidence": "medium"
+      },
+      {
+        "id": "fl_costs",
+        "pathId": "freelance",
+        "field": "businessCostsMonthly",
+        "label": "Monthly business costs",
+        "rationale": "Design software, insurance, accounting and similar costs usually run 3 to 10 percent of revenue. Here that is roughly 200 to 550 a month.",
+        "source": "ai_estimate",
+        "confidence": "medium"
+      },
+      {
+        "id": "fl_tax",
+        "pathId": "freelance",
+        "field": "taxRate",
+        "label": "Effective tax rate on profit",
+        "rationale": "Self-employment adds the employer's share of social contributions. A rate of 22 to 35 percent is assumed. Check this for your country.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "fl_setup",
+        "pathId": "freelance",
+        "field": "setupCost",
+        "label": "One-off setup cost",
+        "rationale": "About 1,500 for portfolio site, legal setup, software licences and any equipment upgrades.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "fl_volatility",
+        "pathId": "freelance",
+        "field": "revenueVolatility",
+        "label": "Month-to-month income swings",
+        "rationale": "Late invoices and uneven projects commonly move monthly revenue by about 20 percent.",
+        "source": "default",
+        "confidence": "medium"
+      },
+      {
+        "id": "hy_transition",
+        "pathId": "hybrid",
+        "field": "transitionMonths",
+        "label": "Months keeping the job while freelancing",
+        "rationale": "A common plan keeps the job for 3 to 9 months while landing first clients. About 6 months is assumed.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "hy_salary",
+        "pathId": "hybrid",
+        "field": "transitionSalaryFraction",
+        "label": "Share of salary kept during the transition",
+        "rationale": "Assumes you stay full-time in your job until you switch.",
+        "source": "ai_estimate",
+        "confidence": "medium"
+      },
+      {
+        "id": "hy_side_hours",
+        "pathId": "hybrid",
+        "field": "sideHoursPerWeek",
+        "label": "Side freelance hours per week",
+        "rationale": "With a full-time job, 4 to 12 hours a week on evenings and weekends is realistic, with about 8 most likely.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "hy_first_client",
+        "pathId": "hybrid",
+        "field": "freelance.monthsToFirstClient",
+        "label": "Months until first paying client on the side",
+        "rationale": "Finding clients part-time is slower, so this is 1 to 6 months, with about 3 most likely.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "hy_rate",
+        "pathId": "hybrid",
+        "field": "freelance.hourlyRate",
+        "label": "Hourly rate",
+        "rationale": "Uses your expected 60 an hour, with the same range as the full-time path.",
+        "source": "user",
+        "confidence": "medium"
+      },
+      {
+        "id": "hy_hours",
+        "pathId": "hybrid",
+        "field": "freelance.billableHoursPerWeek",
+        "label": "Billable hours once full-time",
+        "rationale": "Uses your expected 22 hours a week after you switch, with room for fewer.",
+        "source": "user",
+        "confidence": "medium"
+      },
+      {
+        "id": "hy_ramp",
+        "pathId": "hybrid",
+        "field": "freelance.rampMonths",
+        "label": "Months from first client to a full workload",
+        "rationale": "Same 3 to 9 month range as the full-time path. Clients landed on the side give a head start when you switch.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "hy_booked",
+        "pathId": "hybrid",
+        "field": "freelance.initialBookedHoursPerWeek",
+        "label": "Work already booked",
+        "rationale": "You have no signed work yet.",
+        "source": "user",
+        "confidence": "high"
+      },
+      {
+        "id": "hy_loss",
+        "pathId": "hybrid",
+        "field": "freelance.monthlyClientLossProb",
+        "label": "Monthly chance of losing a client",
+        "rationale": "A typical 8 percent monthly chance of losing a meaningful share of work.",
+        "source": "default",
+        "confidence": "medium"
+      },
+      {
+        "id": "hy_costs",
+        "pathId": "hybrid",
+        "field": "freelance.businessCostsMonthly",
+        "label": "Monthly business costs",
+        "rationale": "Slightly lower than the full-time path, because side work needs less spending at first.",
+        "source": "ai_estimate",
+        "confidence": "medium"
+      },
+      {
+        "id": "hy_tax",
+        "pathId": "hybrid",
+        "field": "freelance.taxRate",
+        "label": "Effective tax rate on profit",
+        "rationale": "Side income stacks on top of your salary, so it may be taxed at a higher rate. A rate of 25 to 37 percent is assumed.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "hy_setup",
+        "pathId": "hybrid",
+        "field": "freelance.setupCost",
+        "label": "One-off setup cost",
+        "rationale": "About 1,000, since you can build the portfolio and set things up gradually while still employed.",
+        "source": "ai_estimate",
+        "confidence": "low"
+      },
+      {
+        "id": "hy_volatility",
+        "pathId": "hybrid",
+        "field": "freelance.revenueVolatility",
+        "label": "Month-to-month income swings",
+        "rationale": "Monthly revenue typically moves by about 20 percent.",
+        "source": "default",
+        "confidence": "medium"
+      }
+    ]
+  },
+  "key": "5d4eed77eeb6ae17"
+}

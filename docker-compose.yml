@@ -1,7 +1,7 @@
-# Local MongoDB for development (Roadmap Phase 2+).
+# Optional local MongoDB, for offline work or fast e2e tests. The app normally uses MongoDB Atlas.
 #   docker compose up -d
-# Then set MONGODB_URI=mongodb://localhost:27017/futuria in apps/api/.env
-# Alternative without Docker: a free MongoDB Atlas cluster.
+# Then set MONGODB_URI=mongodb://localhost:27017/futuria in apps/api/.env (or leave
+# MONGODB_TEST_URI unset, and the e2e tests use it).
 services:
   mongo:
     image: mongo:8

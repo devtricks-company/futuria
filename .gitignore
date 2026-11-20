@@ -11,3 +11,11 @@ coverage/
 *.log
 .DS_Store
 .vercel
+
+# AI eval reports (pnpm eval)
+apps/api/evals/results/
+
+# Playwright (pnpm --filter @futuria/web test:e2e)
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/blob-report/

@@ -8,6 +8,13 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
+    "db:setup": "nest build && node dist/scripts/db-setup.js",
+    "smoke": "node scripts/smoke.mjs",
+    "ai:probe": "tsx scripts/ai-probe.ts",
+    "eval": "tsx evals/run-eval.ts",
+    "fixtures:record": "tsx scripts/record-fixtures.ts",
+    "stripe:setup": "tsx scripts/stripe-setup.ts",
+    "stripe:listen": "tsx scripts/stripe-listen.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests && vitest run --config ./vitest.config.e2e.ts",
@@ -15,13 +22,21 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
+    "@clerk/backend": "3.29.0",
     "@futuria/engine": "workspace:*",
     "@futuria/shared": "workspace:*",
     "@nestjs/common": "12.4.2",
+    "@nestjs/config": "12.1.1",
     "@nestjs/core": "12.4.2",
+    "@nestjs/mongoose": "12.0.1",
     "@nestjs/platform-express": "12.4.2",
+    "inngest": "4.26.2",
+    "mongoose": "9.12.1",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "stripe": "23.1.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@futuria/config": "workspace:*",
@@ -33,6 +48,7 @@
     "@types/supertest": "7.2.1",
     "eslint": "10.15.0",
     "supertest": "7.3.2",
+    "tsx": "4.23.15",
     "typescript": "~6.0.3",
     "vite": "^8.0.0",
     "vitest": "5.1.0"

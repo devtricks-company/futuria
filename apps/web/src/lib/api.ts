@@ -1,19 +1,118 @@
-/** Server-side base URL of the FUTURIA API. */
-export const API_URL = process.env.API_URL ?? 'http://localhost:4000';
+import type {
+  ApiErrorBody,
+  BillingUrlDto,
+  CheckoutRequest,
+  DecisionModel,
+  IntakeAnswersRequest,
+  MeDto,
+  PlanId,
+  Profile,
+  ProfileDto,
+  ShareRequest,
+  ShareSettingsDto,
+  SimulationDto,
+  SimulationSummaryDto,
+} from '@futuria/shared';
 
-export interface ApiHealth {
-  status: 'ok';
-  service: string;
-  engineVersion: string;
-  time: string;
-}
+/*
+ * Browser client for the FUTURIA API, through the same-origin proxy at /api/backend (see
+ * app/api/backend/[...path]/route.ts). Use it from Client Components (TanStack Query).
+ */
 
-export async function fetchHealth(): Promise<ApiHealth | null> {
-  try {
-    const res = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) return null;
-    return (await res.json()) as ApiHealth;
-  } catch {
-    return null;
+const BASE = '/api/backend';
+
+/** An API error with its structured body ({ statusCode, code, message, issues }). */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string | undefined;
+  readonly issues: ApiErrorBody['issues'];
+  /** On plan errors: the cheapest plan that would allow the request. */
+  readonly requiredPlan: PlanId | undefined;
+  /** On plan_feature errors: the feature that was refused (e.g. "pdfExport"). */
+  readonly feature: ApiErrorBody['feature'];
+
+  constructor(status: number, body: Partial<ApiErrorBody> | null) {
+    super(body?.message || `Request failed (${status})`);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = body?.code;
+    this.issues = body?.issues;
+    this.requiredPlan = body?.requiredPlan;
+    this.feature = body?.feature;
+  }
+
+  /** Worth retrying: the server or AI was busy or unavailable, not a problem with the request. */
+  get retryable(): boolean {
+    return this.status >= 500 || this.status === 429;
   }
 }
+
+/** Show a readable message for any thrown value. */
+export function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return 'Something went wrong. Please try again.';
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method,
+      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiError(0, { message: 'You appear to be offline. Check your connection.' });
+  }
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  let data: unknown = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = null;
+  }
+  if (!res.ok) throw new ApiError(res.status, data as Partial<ApiErrorBody> | null);
+  return data as T;
+}
+
+export const api = {
+  me: () => request<MeDto>('GET', '/me'),
+  profile: () => request<ProfileDto>('GET', '/me/profile'),
+  saveProfile: (profile: Profile) => request<ProfileDto>('PUT', '/me/profile', profile),
+
+  listSimulations: () => request<SimulationSummaryDto[]>('GET', '/simulations'),
+  getSimulation: (id: string) => request<SimulationDto>('GET', `/simulations/${id}`),
+  deleteSimulation: (id: string) => request<void>('DELETE', `/simulations/${id}`),
+
+  /** Claude reads the decision: scope, safety, questions and proposed paths (~10 s). */
+  intake: (decisionText: string) =>
+    request<SimulationDto>('POST', '/simulations/intake', { decisionText }),
+  saveAnswers: (id: string, body: IntakeAnswersRequest) =>
+    request<SimulationDto>('PATCH', `/simulations/${id}/answers`, body),
+  /** Claude builds the decision model from the answers (~30 s). */
+  buildModel: (id: string) => request<SimulationDto>('POST', `/simulations/${id}/model`),
+  updateModel: (id: string, model: DecisionModel) =>
+    request<SimulationDto>('PATCH', `/simulations/${id}/model`, { model }),
+  /** Queue the engine + story pipeline (202); poll getSimulation until ready or failed. */
+  run: (id: string) => request<SimulationDto>('POST', `/simulations/${id}/run`),
+  /** Public link settings; the link itself is `/share/<slug>` (lib/share-view.ts). */
+  share: (id: string, body: ShareRequest) =>
+    request<ShareSettingsDto>('POST', `/simulations/${id}/share`, body),
+
+  /** Start Stripe Checkout; redirect the browser to the returned URL. */
+  checkout: (body: CheckoutRequest) => request<BillingUrlDto>('POST', '/billing/checkout', body),
+  /** Open the Stripe Customer Portal (change plan, cancel, invoices). */
+  portal: () => request<BillingUrlDto>('POST', '/billing/portal'),
+  /** Sync the plan right after Checkout, before the webhook arrives. */
+  syncBilling: (sessionId: string) => request<void>('POST', '/billing/sync', { sessionId }),
+};
+
+export const queryKeys = {
+  me: ['me'] as const,
+  profile: ['profile'] as const,
+  simulations: ['simulations'] as const,
+  simulation: (id: string) => ['simulation', id] as const,
+};

@@ -8,3 +8,5 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
   '@nestjs/core': false
+  protobufjs: false
+  core-js: false

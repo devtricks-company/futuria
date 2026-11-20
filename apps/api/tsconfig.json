@@ -21,5 +21,5 @@
     "strictPropertyInitialization": false,
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "test", "vitest.config.ts", "vitest.config.e2e.ts"]
+  "include": ["src", "test", "evals", "scripts", "vitest.config.ts", "vitest.config.e2e.ts"]
 }

@@ -1,0 +1,24 @@
+# Build context for apps/api/Dockerfile (built from the repo root).
+
+# Never send secrets or local build output.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+
+# Not needed to build or run the API.
+.git
+.github
+.claude
+.vscode
+docs
+apps/api/test
+apps/api/evals
+# The web app isn't part of the image, but pnpm still reads its manifest for the lockfile.
+apps/web/*
+!apps/web/package.json

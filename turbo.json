@@ -20,7 +20,8 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": [],
+      "passThroughEnv": ["MONGODB_TEST_URI"]
     },
     "demo": {
       "dependsOn": ["^build"],
