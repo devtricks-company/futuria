@@ -63,6 +63,14 @@ const C = {
   estimateSurface: '#fef3c7',
 } as const;
 
+/*
+ * No `lineHeight` anywhere in this document: text uses the font's own line height (1.26 for Plus
+ * Jakarta Sans). react-pdf (layout 5.x) resolves styles again every time it re-lays out a page,
+ * and each pass multiplies an already-resolved lineHeight by the font size once more, whatever
+ * its unit. Fixed elements are re-laid out on every page, so the footer's lineHeight grew about
+ * 9.5x per page: it was pushed off the page, and past ~10 pages pdfkit threw "unsupported number"
+ * (a 500 on download). The test in report-document.test.ts covers this.
+ */
 const s = StyleSheet.create({
   page: {
     paddingTop: 40,
@@ -70,13 +78,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 44,
     fontFamily: FONT,
     fontSize: 9.5,
-    lineHeight: 1.4,
     color: C.foreground,
   },
   row: { flexDirection: 'row' },
   muted: { color: C.muted },
   bold: { fontWeight: 700 },
-  h1: { fontSize: 22, fontWeight: 700, lineHeight: 1.15, letterSpacing: -0.4 },
+  h1: { fontSize: 22, fontWeight: 700, letterSpacing: -0.4 },
   h2: { fontSize: 15, fontWeight: 700, marginBottom: 8, letterSpacing: -0.2 },
   h3: { fontSize: 11.5, fontWeight: 700, marginBottom: 4 },
   section: { marginTop: 22 },
