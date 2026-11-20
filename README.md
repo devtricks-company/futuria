@@ -16,8 +16,8 @@ and narrates the results.
 
 ## Status
 
-- **Phase 0 (foundations)**: done, except the hosted deploys (they need your Vercel, Railway or
-  Fly, and MongoDB Atlas accounts).
+- **Phase 0 (foundations)**: done. The hosted staging deploy (web on Vercel, API on Azure Container
+  Apps) is in [`docs/DEPLOY.md`](docs/DEPLOY.md).
 - **Phase 1 (simulation engine)**: done.
 - **Phase 2 (API core and data)**: done, on MongoDB Atlas with dev auth until Clerk keys are added.
 
