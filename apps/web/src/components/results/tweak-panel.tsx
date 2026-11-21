@@ -149,9 +149,8 @@ export function RiskChange({
  * "Tweak the future": sliders recompute every chart on this device, instantly and for free.
  * "Update story" saves the tweaks and asks Claude for a new story about them.
  *
- * As a `panel` (beside the results) it fills its parent's height: the title on top, the actions
- * pinned to the bottom and the sliders scrolling between them when they don't fit. In a `sheet`
- * everything flows and the sheet scrolls.
+ * Everything flows top to bottom with no inner scroll: as a `panel` (beside the results) the
+ * frame grows to fit every slider; in a `sheet` the sheet itself scrolls.
  */
 export function TweakPanel({
   idPrefix,
@@ -193,20 +192,15 @@ export function TweakPanel({
   const intro = 'Drag a slider: every number re-runs right here in your browser, for free.';
   const panel = variant === 'panel';
   return (
-    <div className={cn('flex flex-col gap-5', panel && 'min-h-0 flex-1')}>
+    <div className="flex flex-col gap-5">
       {panel ? (
         <TweakHeading computing={computing}>{intro}</TweakHeading>
       ) : (
         <p className="text-sm text-muted">{intro}</p>
       )}
-      <div
-        className={cn(
-          'flex flex-col gap-5',
-          // Room for the thumbs' focus rings, and a fade where the list continues out of view.
-          panel &&
-            '-mx-2 min-h-0 flex-1 overflow-y-auto px-2 pb-6 [scrollbar-width:thin] [mask-image:linear-gradient(to_bottom,black_calc(100%-1.5rem),transparent)]',
-        )}
-      >
+      {/* On top and always there, so each slider's effect shows while it moves. */}
+      <RiskChange before={before} after={after} colorIndex={colorIndex} />
+      <div className="flex flex-col gap-5">
         {groups.map((group) => (
           <section key={group.pathId ?? 'baseline'} className="flex flex-col gap-4">
             <h3 className="flex items-center gap-2 text-xs font-semibold text-muted">
@@ -228,13 +222,10 @@ export function TweakPanel({
       </div>
       <div className="flex flex-col gap-3">
         {tweaked ? (
-          <>
-            <RiskChange before={before} after={after} colorIndex={colorIndex} />
-            <Button onClick={onUpdateStory} disabled={updating}>
-              <Sparkles />
-              {updating ? 'Starting…' : 'Update the story'}
-            </Button>
-          </>
+          <Button onClick={onUpdateStory} disabled={updating}>
+            <Sparkles />
+            {updating ? 'Starting…' : 'Update the story'}
+          </Button>
         ) : hint ? (
           <TweakHint>{hint}</TweakHint>
         ) : null}
