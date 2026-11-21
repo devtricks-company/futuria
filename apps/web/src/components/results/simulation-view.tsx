@@ -473,18 +473,15 @@ function Results({ simulation }: { simulation: SimulationDto }) {
               </TabsContent>
             </div>
 
-            {/* Desktop: the sliders stay beside the charts. The view on the left sets the frame's
-                height (the absolute layer keeps the sliders out of it); the panel fills that
-                height, or the screen's on long views, where it sticks while the page scrolls. */}
+            {/* Desktop: the sliders sit beside the charts. They count toward the frame's height,
+                so the frame grows until every slider and button shows. No inner scroll and no
+                sticky: the list is often taller than the screen, and a stuck panel would hide
+                its bottom. */}
             <aside
               aria-label="Tweak the future"
-              className="relative hidden min-h-[34rem] border-l border-border bg-surface-muted/60 lg:block"
+              className="hidden border-l border-border bg-surface-muted/60 lg:block"
             >
-              <div className="absolute inset-0">
-                <div className="sticky top-24 flex h-full max-h-[calc(100dvh-7rem)] flex-col p-6">
-                  {tweakPanel('desk', 'panel')}
-                </div>
-              </div>
+              <div className="flex flex-col p-6">{tweakPanel('desk', 'panel')}</div>
             </aside>
           </div>
         </div>
